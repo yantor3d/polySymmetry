@@ -139,6 +139,9 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
         faceIndices.size() == 2 &&
         (leftSideVertexSelected ? numberOfVerticesSelected == 3 : numberOfVerticesSelected == 2)
     ) {
+        bool edge0NotOnBorder = meshData.edgeData[edgeIndices[0]].connectedFaces.size() > 1;
+        bool edge1NotOnBorder = meshData.edgeData[edgeIndices[1]].connectedFaces.size() > 1;
+
         vector<int> edgesOnFace0 = intersection(meshData.faceData[faceIndices[0]].connectedEdges, edgeIndices);
         vector<int> edgesOnFace1 = intersection(meshData.faceData[faceIndices[1]].connectedEdges, edgeIndices);
 
@@ -148,6 +151,7 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
         vector<int> verticesOnEdge0 = intersection(meshData.edgeData[edgeIndices[0]].connectedVertices, vertexIndices);
         vector<int> verticesOnEdge1 = intersection(meshData.edgeData[edgeIndices[1]].connectedVertices, vertexIndices);
 
+        bool edgesAreNotOnBorder = edge0NotOnBorder && edge1NotOnBorder;
         bool edgesAreOnFaces = (edgesOnFace1.size() == 1 && edgesOnFace1.size() == 1 && edgesOnFace0[0] != edgesOnFace1[0]);
         bool verticesAreOnFaces = (verticesOnFace0.size() == 1 && verticesOnFace0.size() == 1 && verticesOnFace0[0] != verticesOnFace1[0]);
         bool verticesAreOnEdges = (verticesOnEdge0.size() == 1 && verticesOnEdge1.size() == 1 && verticesOnEdge0[0] != verticesOnEdge1[0]);
@@ -166,7 +170,7 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
 
         bool leftSideVertexFound = vertexIndices.size() == 3 ? leftSideVertex != -1 : true;
 
-        result = (edgesAreOnFaces && verticesAreOnFaces && verticesAreOnEdges && leftSideVertexFound);
+        result = (edgesAreNotOnBorder && edgesAreOnFaces && verticesAreOnFaces && verticesAreOnEdges && leftSideVertexFound);
 
         if (result)
         {
