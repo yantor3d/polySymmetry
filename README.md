@@ -20,10 +20,10 @@ To active the tool, run this Python command:
 Select the mesh you want find the symmetry of, and press Enter.
 
 Select seven components, and press Enter. The seven components should be:
-  * A vertex on the left side of the mesh
+  * A vertex on the left side of the mesh. This vertex must not touch any other selected component.
   * A vertex, an edge, and a face on each side of the mesh. 
     The selected vertex must be on the selected edge, which must be on the 
-    selected face. 
+    selected face. The selected edges must not be border edges.
 
 After each selection of seven, the vertices of the mesh will be colored 
 according to which side of the mesh they are on. If any vertices are 
