@@ -50,9 +50,9 @@ private:
     virtual void        insertAll(MIntArray &src, vector<int> &dest);
 
 public:
-    int                     numberOfVertices;
-    int                     numberOfEdges;
-    int                     numberOfFaces;
+    int                     numberOfVertices = 0;
+    int                     numberOfEdges = 0;
+    int                     numberOfFaces = 0;
     
     vector<VertexData>      vertexData;
     vector<EdgeData>        edgeData;

@@ -21,11 +21,7 @@
 using namespace std;
 
 MeshData::MeshData()
-{
-    numberOfEdges = 0;
-    numberOfFaces = 0;
-    numberOfVertices = 0;
-    
+{    
     vertexData = vector<VertexData>();
     edgeData = vector<EdgeData>();
     faceData = vector<FaceData>();
@@ -76,8 +72,9 @@ void MeshData::unpackEdges(MItMeshEdge &edges)
     {
         EdgeData &edge = edgeData[edges.index()];
 
-        edge.connectedVertices.push_back(edges.index(0));
-        edge.connectedVertices.push_back(edges.index(1));
+        edge.connectedVertices.resize(2);
+        edge.connectedVertices[0] = edges.index(0);
+        edge.connectedVertices[1] = edges.index(1);
 
         sort(edge.connectedVertices.begin(), edge.connectedVertices.end());
         
@@ -171,9 +168,11 @@ void MeshData::unpackVertexSiblings()
 
 void MeshData::insertAll(MIntArray &src, vector<int> &dest)
 {
+    dest.resize(src.length());
+
     for (uint i = 0; i < src.length(); i++)
     {
-        dest.push_back(src[i]);
+        dest[i] = src[i];
     }
 
     sort(dest.begin(), dest.end());
