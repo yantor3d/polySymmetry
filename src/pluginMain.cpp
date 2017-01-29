@@ -32,13 +32,13 @@
 #include <maya/MStatus.h>
 
 const char* kAUTHOR = "Ryan Porter";
-const char* kVERSION = "1.0.1";
+const char* kVERSION = "0.0.1";
 const char* kREQUIRED_API_VERSION = "Any";
 
 MString PolySymmetryContextCmd::COMMAND_NAME = "polySymmetryCtx";
 MString PolySymmetryCommand::COMMAND_NAME = "polySymmetry";
 
-MString PolySymmetryNode::NODE_NAME = "meshSymmetryData";
+MString PolySymmetryNode::NODE_NAME = "polySymmetryData";
 MTypeId PolySymmetryNode::NODE_ID = 0x00126b0d;
 
 MStatus initializePlugin(MObject obj)
