@@ -1,5 +1,6 @@
-/*
-    PLUGIN NAME: polySymmetry
+/**
+    Copyright (c) 2017 Ryan Porter    
+    You may use, distribute, or modify this code under the terms of the MIT license.
 */
 
 #ifndef MESH_DATA_CMD_H

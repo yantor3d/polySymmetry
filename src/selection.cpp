@@ -1,3 +1,8 @@
+/**
+    Copyright (c) 2017 Ryan Porter    
+    You may use, distribute, or modify this code under the terms of the MIT license.
+*/
+
 #include "selection.h"
 #include "meshData.h"
 #include "util.h"
@@ -93,6 +98,20 @@ void getSelectedComponentIndices(
     }
 }
 
+/**
+ *  Returns true if the selection is a valid selection of symmetrical components and packs them into the ComponentSelection. 
+ *  
+ *  A valid selection must contain:
+ *      - exactly two faces 
+ *      - exactly two edges 
+ *      - exactly two vertices if leftSideVertexSelected is false, otherwise exactly three faces 
+ *
+ *  Furthermore:
+ *      Each selected edge must be on exactly one of the selected faces.
+ *      Each selected edge must have two adjacent faces.
+ *      Each selected vertex must be on exactly on of the selected edges. 
+ *      If left side vertex is selected, the third vertex must not touch any other component. 
+ */
 
 bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &selection, ComponentSelection &componentSelection, bool leftSideVertexSelected)
 {

@@ -1,3 +1,38 @@
+/**
+    Copyright (c) 2017 Ryan Porter    
+    You may use, distribute, or modify this code under the terms of the MIT license.
+*/
+
+/*
+The poly symmetry algorithm traverses the topology of a polygon mesh to 
+calculate the symmetry of its components. It does this by examining pairs of 
+edges that are known to be symmetrical, walking the vertices of the faces 
+adjacent to the edges, establishing a symmetry table. 
+
+Because an edge may have two adjacent faces, the user must provide starting 
+data for the algorithm in the form of a pair of symmetrical faces, edges, 
+and vertices. The edges must be on the faces, and the vertices must be on 
+the edges. 
+
+From this initial condition, we can assume that the other vertices 
+on the edges are symmetrical. Once an edge, the the vertices on it, and one
+of the faces adjacent to it have had their symmetry computed, the rest of the 
+components on the shell can have their symmetry computed thus:
+
+    > Start on an edge with known symmetry, whose vertices have known 
+      symmetry, and is on a face with known symmetry. 
+    > Get the other face connected to the edge - its symmetry is unknown.     
+    > Starting at either vertex on the edge, walk to its other neighboring 
+      vertex on the face. A neighboring vertex is a vertex on the same face 
+      connected by an edge. On the edge that is symmetrical to this edge, 
+      do the same. These neighboring vertices are symmetrical, as is the edge 
+      that was traversed to find them. 
+    > Repeat until all the vertices on the face have had their 
+      symmetry computed. 
+    > Repeat the algorithm, starting at each pair of traversed edges, until 
+      the symmetry of all components on this shell are computed.
+*/
+
 #include "meshData.h"
 #include "polySymmetry.h"
 #include "selection.h"
