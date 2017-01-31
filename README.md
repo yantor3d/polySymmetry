@@ -54,17 +54,61 @@ polySymmetryData node will be created with the symmetry data baked into.
 ------------
 **polySymmetry**
     
-When completed, the polySymmetry tool prints the equivalent MEL command for querying the symmetry of a mesh. 
-You can use this command to return the symmetry as a JSON string if you call it with the -constructionHistory flag set to false. You only need to pass the component names to the `-symmetry` and `-leftSideVertex` flags, not the entire DAG path.
-
+**Synopsis**
 ```
+polySymmetry 
+    [-constructionHistory], 
+    [-exists], 
+    [-leftSideVertex], 
+    [-symmetry]
+    [mesh or polySymmetryData]
+```
+
+polySymmetry is undoable, queryable, and **NOT editable**.
+
+Returns a component symmetry table for a polygon mesh.
+
+If constructionHistory is on, the symmetry table is baked into a polySymmetryData node. Otherwise, it is encoded as a JSON string. 
+
+In query mode, return type is based on queried flag(s) and the node argument.
+
+**Long name (short name)** | Argument types | Properties
+:-------------------------- | :-------------- | :----------
+**constructionHistory (ch)** | *boolean* | [C]
+    If true, bake the symmetry table to a node and return the node. Otherwise, encode the symmetry table as a JSON object and return it. Default: true. | |
+**exists (ex)** | *boolean* | [Q]
+Return true if a polySymmetryData node exists for the selected mesh.  | |
+**leftSideVertex (lsv)** | *component* | [C]
+Component name (eg, vtx[7]) of a vertex on the *left* side of the mesh. There must be at least one left side vertex. | |
+**symmetry (sym)** | *componentList* | [C]
+Components (eg, f[13] f[37] e[41] e[7] vtx[3] vtx[501]) that are known to be symmetrical. Must provide exactly two faces, two edges, and two vertices. Each vertex must be on one of the edges, and each edge must be on one of the faces. The edges must have two adjacent faces. | |
+
+**Examples**
+```
+// This command create the symmetry table. The constructionHistory flag is on by default.
 polySymmetry -symmetry f[354] f[603] e[775] e[1103] vtx[350] vtx[503] -leftSideVertex vtx[0] head_MESH;
-// Result: meshSymmetryData1 // 
+// Result: polySymmetryData1 // 
 ```
-
-You can use the -query flag to return the symmetry as a JSON strong from an existing polySymmetryData node. The example above omits some data for brevity. You can use the Python `json` module to decode the JSON data as a dictionary.
-
 ```
-polySymmetry -q meshSymmetryData1
-// Result { "edge": { "symmetry": [...], "sides": [...] }, "faces": { ... }, "vertices": { ... }} //
+// Turning the construction history flag off will return the symmetry table as a JSON object.
+polySymmetry -symmetry f[354] f[603] e[775] e[1103] vtx[350] vtx[503] -leftSideVertex vtx[0] -ch 0 head_MESH;
+// Result truncated for brevity.
+// Result:: { "e": { "symmetry": [...], "sides": [...] }, "f": { ... }, "vtx": { ... }} //
+```
+```
+// polySymmetryData nodes are cached in memory based on a checksum of the mesh's topology. 
+// You can query the cache with a mesh to retrieve the matching polySymmetryData node.
+// If there is no match, an empty string is returned.
+polySymmetry -q myMesh;
+// Result: polySymmetryData1
+```
+```
+// You can query the cache with a mesh to ascertain whether or not there is a matching polySymmetryData node.
+polySymmetry -q -ex yourMesh;
+// Result: 0
+```
+```
+// You can query a polySymmetryData node to get the symmetry table as a JSON object.
+polySymmetry -q polySymmetryData1
+// Result { "e": { "symmetry": [...], "sides": [...] }, "f": { ... }, "vtx": { ... }} //
 ```
