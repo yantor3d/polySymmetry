@@ -9,12 +9,10 @@
 #include "meshData.h"
 #include "polySymmetry.h"
 
-#include <utility>
 #include <vector>
 
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
-#include <maya/MDGModifier.h>
 #include <maya/MPxToolCommand.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
@@ -32,6 +30,9 @@ using namespace std;
 #define CONSTRUCTION_HISTORY_FLAG       "-ch"
 #define CONSTRUCTION_HISTORY_LONG_FLAG  "-constructionHistory"
 
+#define EXISTS_FLAG                     "-ex"
+#define EXISTS_LONG_FLAG                "-exists"
+
 
 class PolySymmetryCommand : public MPxToolCommand
 {
@@ -45,6 +46,10 @@ public:
     virtual MStatus     doIt(const MArgList& argList);
     virtual MStatus     redoIt();
     virtual MStatus     undoIt();
+
+    virtual MStatus     doQueryDataAction();
+    virtual MStatus     doQueryMeshAction();
+    virtual MStatus     doUndoableCommand();
 
     virtual MStatus     parseQueryArguments(MArgDatabase &argsData);
     virtual MStatus     parseArguments(MArgDatabase &argsData);
@@ -65,8 +70,6 @@ public:
 
     virtual MStatus     createResultNode();
     virtual MStatus     createResultString();
-    virtual MStatus     setValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values);
-    virtual MStatus     getValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values);
 
     virtual MStatus     finalize();
 
@@ -79,8 +82,9 @@ public:
     static MString      COMMAND_NAME;
 
 private:
-    bool                        constructionHistory;
-    bool                        isQuery;
+    bool                        constructionHistory = false;
+    bool                        isQuery = false;
+    bool                        isQueryExists = false;
 
     MDagPath                    selectedMesh;
     MeshData                    meshData;

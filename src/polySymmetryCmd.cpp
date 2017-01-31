@@ -6,37 +6,30 @@
 #include "meshData.h"
 #include "polySymmetryCmd.h"
 #include "polySymmetryNode.h"
+#include "sceneCache.h"
 #include "selection.h"
 
 #include <sstream>
-#include <stdio.h>
-#include <string>
 #include <vector>
 
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
+#include <maya/MDGModifier.h>
 #include <maya/MFnDependencyNode.h>
-#include <maya/MFnIntArrayData.h>
 #include <maya/MGlobal.h>
-#include <maya/MIntArray.h>
-#include <maya/MItSelectionList.h>
-#include <maya/MItMeshEdge.h>
-#include <maya/MItMeshVertex.h>
 #include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
-#include <maya/MStringArray.h>
+#include <maya/MString.h>
 #include <maya/MSyntax.h>
 
 using namespace std;
 
 #define RETURN_IF_ERROR(s) if (!s) { return s; }
 
-PolySymmetryCommand::PolySymmetryCommand() {
-    isQuery = false;
-
+PolySymmetryCommand::PolySymmetryCommand() 
+{
     meshSymmetryNode = MObject();
-    constructionHistory = false;
 
     meshData = MeshData();
     meshSymmetryData = PolySymmetryData();
@@ -45,6 +38,7 @@ PolySymmetryCommand::PolySymmetryCommand() {
     leftSideVertexIndices = vector<int>();
 }
 
+
 PolySymmetryCommand::~PolySymmetryCommand() 
 {
     meshData.clear();
@@ -52,10 +46,12 @@ PolySymmetryCommand::~PolySymmetryCommand()
     leftSideVertexIndices.clear();
 }
 
+
 void* PolySymmetryCommand::creator()
 {
     return new PolySymmetryCommand();
 }
+
 
 MSyntax PolySymmetryCommand::getSyntax()
 {
@@ -88,11 +84,18 @@ MSyntax PolySymmetryCommand::getSyntax()
         MSyntax::MArgType::kBoolean
     );
 
+    syntax.addFlag(
+        EXISTS_FLAG,
+        EXISTS_LONG_FLAG,
+        MSyntax::MArgType::kBoolean
+    );
+
     syntax.makeFlagMultiUse(SYMMETRY_COMPONENTS_FLAG);
     syntax.makeFlagMultiUse(LEFT_SIDE_VERTEX_FLAG);
 
     return syntax;
-};
+}
+
 
 MStatus PolySymmetryCommand::doIt(const MArgList& argList)
 {
@@ -105,8 +108,6 @@ MStatus PolySymmetryCommand::doIt(const MArgList& argList)
     {
         status = this->parseQueryArguments(argsData);
         RETURN_IF_ERROR(status);
-        
-        this->isQuery = true;
     } else {
         status = this->parseArguments(argsData);        
         RETURN_IF_ERROR(status);
@@ -117,31 +118,80 @@ MStatus PolySymmetryCommand::doIt(const MArgList& argList)
     return this->redoIt();
 }
 
+
 MStatus PolySymmetryCommand::redoIt()
 {
     MStatus status;
 
     if (this->isQuery)
     {
-        status = this->getSymmetricalComponentsFromNode();
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        this->createResultString();
-    } else {
-        status = this->getSymmetricalComponentsFromScene();
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        if (constructionHistory)
-        {
-            status = this->createResultNode();
-            CHECK_MSTATUS_AND_RETURN_IT(status);
+        if (this->selectedMesh.isValid())
+        {            
+            status = this->doQueryMeshAction();
         } else {
-            this->createResultString();
+            status = this->doQueryDataAction();
+        }
+    } else {
+        status = this->doUndoableCommand();
+    }
+
+    return status;
+}
+
+
+MStatus PolySymmetryCommand::doQueryDataAction()
+{
+    MStatus status = this->getSymmetricalComponentsFromNode();
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    this->createResultString();
+
+    return MStatus::kSuccess;
+}
+
+
+MStatus PolySymmetryCommand::doQueryMeshAction()
+{
+    bool cacheHit = PolySymmetryCache::getNodeFromCache(this->selectedMesh, this->meshSymmetryNode);
+
+    if (this->isQueryExists)
+    {
+        this->setResult(cacheHit);
+    } else {
+        if (cacheHit)
+        {
+            MString resultName = MFnDependencyNode(this->meshSymmetryNode).name();
+            this->setResult(resultName);
+        } else {
+            MString warningMsg("No polySymmetryData node in memory matches the mesh ^1s.");
+            warningMsg.format(warningMsg, this->selectedMesh.partialPathName());
+
+            MGlobal::displayWarning(warningMsg);
         }
     }
 
     return MStatus::kSuccess;
 }
+
+
+MStatus PolySymmetryCommand::doUndoableCommand()
+{
+    MStatus status;
+
+    status = this->getSymmetricalComponentsFromScene();
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    if (constructionHistory)
+    {
+        status = this->createResultNode();
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    } else {
+        this->createResultString();
+    }
+
+    return MStatus::kSuccess;
+}
+
 
 MStatus PolySymmetryCommand::undoIt()
 {
@@ -157,14 +207,19 @@ MStatus PolySymmetryCommand::undoIt()
     return MStatus::kSuccess;
 }
 
+
 const bool PolySymmetryCommand::isUndoable()
 {
     return !this->meshSymmetryNode.isNull();
 }
 
+
 MStatus PolySymmetryCommand::parseQueryArguments(MArgDatabase &argsData)
 {
     MStatus status;
+        
+    this->isQuery = true;
+    this->isQueryExists = argsData.isFlagSet(EXISTS_FLAG);
 
     MSelectionList selection;    
     status = argsData.getObjects(selection);
@@ -176,16 +231,28 @@ MStatus PolySymmetryCommand::parseQueryArguments(MArgDatabase &argsData)
 
     MString objectType = MFnDependencyNode(obj).typeName();
 
-    if (objectType != PolySymmetryNode::NODE_NAME)
+    if (objectType == PolySymmetryNode::NODE_NAME)
     {
-        MGlobal::displayError("polySymmetry command requires a " + PolySymmetryNode::NODE_NAME + " in query mode, not a(n) " + objectType);
-        return MStatus::kFailure;
-    } else {
         this->meshSymmetryNode = obj;
+        return MStatus::kSuccess;
+    }
+    
+    MDagPath dagPath;
+    status = selection.getDagPath(0, dagPath);    
+
+    if (status && dagPath.hasFn(MFn::kMesh))
+    {
+        this->selectedMesh.set(dagPath);
+        return MStatus::kSuccess;
     }
 
-    return MStatus::kSuccess;
+    MString errorMsg("polySymmetry command requires a mesh or ^1s in query node, not a(n) ^2s");
+    errorMsg.format(errorMsg, PolySymmetryNode::NODE_NAME, objectType);
+    MGlobal::displayError(errorMsg);
+
+    return MStatus::kFailure;
 }
+
 
 MStatus PolySymmetryCommand::parseArguments(MArgDatabase &argsData)
 {
@@ -214,6 +281,7 @@ MStatus PolySymmetryCommand::parseArguments(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+
 MStatus PolySymmetryCommand::getSelectedMesh(MArgDatabase &argsData)
 {
     MStatus status;
@@ -240,11 +308,13 @@ MStatus PolySymmetryCommand::getSelectedMesh(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+
 void PolySymmetryCommand::setSelectedMesh(MDagPath &mesh)
 {
     this->selectedMesh.set(mesh);
     this->meshData.unpackMesh(mesh);
 }
+
 
 MStatus PolySymmetryCommand::getSymmetryComponents(MArgDatabase &argsData)
 {
@@ -290,6 +360,7 @@ MStatus PolySymmetryCommand::getSymmetryComponents(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+
 void PolySymmetryCommand::setSymmetryComponents(vector<ComponentSelection> &components)
 {
     for (ComponentSelection &cs : components)
@@ -297,6 +368,7 @@ void PolySymmetryCommand::setSymmetryComponents(vector<ComponentSelection> &comp
         this->symmetryComponents.push_back(cs);
     }
 }
+
 
 MStatus PolySymmetryCommand::getLeftSideVertexIndices(MArgDatabase &argsData)
 {
@@ -325,6 +397,7 @@ MStatus PolySymmetryCommand::getLeftSideVertexIndices(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+
 void PolySymmetryCommand::setLeftSideVertexIndices(vector<int> &indices)
 {
     for (int &i : indices)
@@ -332,6 +405,7 @@ void PolySymmetryCommand::setLeftSideVertexIndices(vector<int> &indices)
         this->leftSideVertexIndices.push_back(i);
     }    
 }
+
 
 MStatus PolySymmetryCommand::getFlagStringArguments(MArgList &args, MSelectionList &selection)
 {
@@ -366,26 +440,27 @@ MStatus PolySymmetryCommand::getSymmetricalComponentsFromNode()
     MStatus status;
     MFnDependencyNode fnNode(this->meshSymmetryNode);
 
-    status = this->getValues(fnNode, EDGE_SYMMETRY, this->meshSymmetryData.edgeSymmetryIndices);
+    status = PolySymmetryNode::getValues(fnNode, EDGE_SYMMETRY, this->meshSymmetryData.edgeSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->getValues(fnNode, FACE_SYMMETRY, this->meshSymmetryData.faceSymmetryIndices);
+    status = PolySymmetryNode::getValues(fnNode, FACE_SYMMETRY, this->meshSymmetryData.faceSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->getValues(fnNode, VERTEX_SYMMETRY, this->meshSymmetryData.vertexSymmetryIndices);
+    status = PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, this->meshSymmetryData.vertexSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->getValues(fnNode, EDGE_SIDES, this->meshSymmetryData.edgeSides);
+    status = PolySymmetryNode::getValues(fnNode, EDGE_SIDES, this->meshSymmetryData.edgeSides);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->getValues(fnNode, FACE_SIDES, this->meshSymmetryData.faceSides);
+    status = PolySymmetryNode::getValues(fnNode, FACE_SIDES, this->meshSymmetryData.faceSides);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->getValues(fnNode, VERTEX_SIDES, this->meshSymmetryData.vertexSides);
+    status = PolySymmetryNode::getValues(fnNode, VERTEX_SIDES, this->meshSymmetryData.vertexSides);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     return MStatus::kSuccess;
 }
+
 
 MStatus PolySymmetryCommand::getSymmetricalComponentsFromScene()
 {
@@ -420,22 +495,31 @@ MStatus PolySymmetryCommand::createResultNode()
 
     MFnDependencyNode fnNode(meshSymmetryNode);
 
-    status = this->setValues(fnNode, EDGE_SYMMETRY, this->meshSymmetryData.edgeSymmetryIndices);
+    status = PolySymmetryNode::setValues(fnNode, EDGE_SYMMETRY, this->meshSymmetryData.edgeSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->setValues(fnNode, FACE_SYMMETRY, this->meshSymmetryData.faceSymmetryIndices);
+    status = PolySymmetryNode::setValues(fnNode, FACE_SYMMETRY, this->meshSymmetryData.faceSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->setValues(fnNode, VERTEX_SYMMETRY, this->meshSymmetryData.vertexSymmetryIndices);
+    status = PolySymmetryNode::setValues(fnNode, VERTEX_SYMMETRY, this->meshSymmetryData.vertexSymmetryIndices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->setValues(fnNode, EDGE_SIDES, this->meshSymmetryData.edgeSides);
+    status = PolySymmetryNode::setValues(fnNode, EDGE_SIDES, this->meshSymmetryData.edgeSides);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->setValues(fnNode, FACE_SIDES, this->meshSymmetryData.faceSides);
+    status = PolySymmetryNode::setValues(fnNode, FACE_SIDES, this->meshSymmetryData.faceSides);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = this->setValues(fnNode, VERTEX_SIDES, this->meshSymmetryData.vertexSides);
+    status = PolySymmetryNode::setValues(fnNode, VERTEX_SIDES, this->meshSymmetryData.vertexSides);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = PolySymmetryNode::setValue(fnNode, NUMBER_OF_EDGES, this->meshData.numberOfEdges);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = PolySymmetryNode::setValue(fnNode, NUMBER_OF_FACES, this->meshData.numberOfFaces);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = PolySymmetryNode::setValue(fnNode, NUMBER_OF_VERTICES, this->meshData.numberOfVertices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     this->setResult(fnNode.name());
@@ -443,56 +527,6 @@ MStatus PolySymmetryCommand::createResultNode()
     return MStatus::kSuccess;
 }
 
-MStatus PolySymmetryCommand::setValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values)
-{
-    MStatus status;
-
-    MPlug plug = fnNode.findPlug(attributeName, false, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    MIntArray valueArray;
-
-    for (int &v : values)
-    { 
-        valueArray.append(v);
-    }
-
-    MFnIntArrayData valueArrayData;
-
-    MObject data = valueArrayData.create(valueArray, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    status = plug.setMObject(data);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    return MStatus::kSuccess;
-}
-
-MStatus PolySymmetryCommand::getValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values)
-{
-    MStatus status;
-
-    MPlug plug = fnNode.findPlug(attributeName, false, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    MObject data = plug.asMObject();
-
-    MFnIntArrayData valueArrayData(data, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    MIntArray valueArray = valueArrayData.array(&status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    uint numberOfValues = valueArray.length();
-    values.resize((int) numberOfValues);
-
-    for (uint i = 0; i < numberOfValues; i++)
-    {
-        values[i] = valueArray[i];
-    }
-
-    return MStatus::kSuccess;
-}
 
 MStatus PolySymmetryCommand::createResultString()
 {
@@ -521,6 +555,7 @@ MStatus PolySymmetryCommand::createResultString()
     return MStatus::kSuccess;
 }
 
+
 void PolySymmetryCommand::setJSONData(const char* key, stringstream &output, vector<int> &data, bool isLast)
 {
     int numberOfItems = (int) data.size();
@@ -546,6 +581,7 @@ void PolySymmetryCommand::setJSONData(const char* key, stringstream &output, vec
         output << ", ";
     }
 }
+
 
 MStatus PolySymmetryCommand::finalize()
 {

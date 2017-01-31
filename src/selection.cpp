@@ -7,16 +7,10 @@
 #include "meshData.h"
 #include "util.h"
 
-#include <sstream>
-#include <stdio.h>
 #include <vector>
-#include <utility>
 
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
-#include <maya/MObjectArray.h>
-#include <maya/MIntArray.h>
-#include <maya/MItGeometry.h>
 #include <maya/MItMeshEdge.h>
 #include <maya/MItMeshPolygon.h>
 #include <maya/MItMeshVertex.h>
@@ -117,8 +111,6 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
 {
     bool result = true;
 
-    stringstream ss;
-
     MDagPath mesh;
     MObject component;
 
@@ -168,7 +160,7 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
             leftSideVertex = v;
         }
 
-        bool leftSideVertexFound = vertexIndices.size() == 3 ? leftSideVertex != -1 : true;
+        bool leftSideVertexFound = leftSideVertexSelected ? leftSideVertex != -1 : true;
 
         result = (edgesAreNotOnBorder && edgesAreOnFaces && verticesAreOnFaces && verticesAreOnEdges && leftSideVertexFound);
 

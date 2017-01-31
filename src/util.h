@@ -6,7 +6,6 @@
 #ifndef POLYSYMMETRY_UTIL_H
 #define POLYSYMMETRY_UTIL_H
 
-#include <sstream>
 #include <algorithm>
 #include <vector>
 

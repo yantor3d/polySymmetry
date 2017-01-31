@@ -10,20 +10,17 @@
 #include "polySymmetry.h"
 
 #include <vector>
-#include <stack>
 
 #include <maya/MColor.h>
 #include <maya/MColorArray.h>
 #include <maya/MDagPath.h>
 #include <maya/MEvent.h>
-#include <maya/MFnMesh.h>
-#include <maya/MIntArray.h>
-#include <maya/MObjectArray.h>
 #include <maya/MPxContext.h>
 #include <maya/MPxContextCommand.h>
 #include <maya/MPxSelectionContext.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
+#include <maya/MStatus.h>
 
 using namespace std;
 

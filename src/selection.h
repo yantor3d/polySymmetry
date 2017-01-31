@@ -13,7 +13,6 @@
 
 #include <maya/MDagPath.h>
 #include <maya/MFn.h>
-#include <maya/MIntArray.h>
 #include <maya/MSelectionList.h>
 
 using namespace std;

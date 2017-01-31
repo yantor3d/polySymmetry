@@ -6,23 +6,22 @@
 #include "polySymmetryTool.h"
 #include "polySymmetryCmd.h"
 #include "selection.h"
+#include "sceneCache.h"
 #include "util.h"
 
 #include <algorithm>
 #include <sstream>
-#include <stack>
-#include <stdio.h>
 #include <vector>
 
+#include <maya/MFnMesh.h>
 #include <maya/MGlobal.h>
 #include <maya/MItSelectionList.h>
-#include <maya/MItMeshEdge.h>
-#include <maya/MItMeshVertex.h>
 #include <maya/MPlug.h>
 #include <maya/MPxContext.h>
 #include <maya/MPxToolCommand.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
+#include <maya/MStatus.h>
 
 using namespace std;
 
@@ -210,6 +209,20 @@ MStatus PolySymmetryTool::getSelectedMesh()
 
     if (this->selectedMesh.isValid())
     {
+        MObject obj;
+        bool cacheHit = PolySymmetryCache::getNodeFromCache(this->selectedMesh, obj);
+
+        if (cacheHit)
+        {
+            MString warningMsg("Symmetry data already exists for ^1s - ^2s.");
+            warningMsg.format(warningMsg, selectedMesh.partialPathName(), MFnDependencyNode(obj).name());
+
+            MGlobal::displayError(warningMsg);
+
+            this->abortAction();
+            return MStatus::kFailure;
+        }
+
         symmetryData.initialize(selectedMesh);
         meshData.unpackMesh(selectedMesh);
         MFnMesh meshFn(selectedMesh);

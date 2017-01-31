@@ -6,12 +6,21 @@
 #ifndef POLY_SYMMETRY_NODE_H
 #define POLY_SYMMETRY_NODE_H
 
+#include <string>
+#include <vector>
+
+#include <maya/MDagPath.h>
 #include <maya/MDataHandle.h>
+#include <maya/MFnDependencyNode.h>
 #include <maya/MPxNode.h>
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MString.h>
 #include <maya/MTypeId.h>
+
+#define NUMBER_OF_EDGES "numberOfEdges"
+#define NUMBER_OF_FACES "numberOfFaces"
+#define NUMBER_OF_VERTICES "numberOfVertices"
 
 #define EDGE_SYMMETRY "edgeSymmetry"
 #define FACE_SYMMETRY "faceSymmetry"
@@ -21,18 +30,36 @@
 #define FACE_SIDES "faceSides"
 #define VERTEX_SIDES "vertexSides"
 
+using namespace std;
+
 class PolySymmetryNode : MPxNode
 {
 public:
                         PolySymmetryNode();
     virtual            ~PolySymmetryNode();
 
-    virtual MStatus     compute(const MPlug &plug, MDataBlock &dataBlock);
-    static  MStatus     initialize();
-
     static  void*       creator();
+    static  MStatus     initialize();
     
+    virtual MStatus     compute(const MPlug &plug, MDataBlock &dataBlock);
+
+    static MStatus      setValue(MFnDependencyNode &fnNode, const char* attributeName, int &value);
+    static MStatus      getValue(MFnDependencyNode &fnNode, const char* attributeName, int &value);
+
+    static MStatus      setValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values);
+    static MStatus      getValues(MFnDependencyNode &fnNode, const char* attributeName, vector<int> &values);
+    
+    static MStatus      onInitializePlugin();
+    static MStatus      onUninitializePlugin();
+
+    static MStatus      getCacheKey(MObject &node, string &key);
+    static MStatus      getCacheKeyFromMesh(MDagPath &node, string &key);
+
 public:
+    static MObject      numberOfEdges;
+    static MObject      numberOfFaces;
+    static MObject      numberOfVertices;
+
     static MObject      edgeSymmetry;
     static MObject      faceSymmetry;
     static MObject      vertexSymmetry;
