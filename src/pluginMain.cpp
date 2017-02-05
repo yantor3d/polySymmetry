@@ -2,12 +2,13 @@
     Copyright (c) 2017 Ryan Porter
 */
 
+#include "polyDeformerWeights.h"
 #include "polyFlipCmd.h"
+#include "polyMirrorCmd.h"
 #include "polySymmetryTool.h"
 #include "polySymmetryCmd.h"
 #include "polySymmetryNode.h"
 #include "sceneCache.h"
-#include "polyMirrorCmd.h"
 
 #include <maya/MFnPlugin.h>
 #include <maya/MTypeId.h>
@@ -19,6 +20,8 @@ const char* kVERSION = "0.0.1";
 const char* kREQUIRED_API_VERSION = "Any";
 
 MString PolyFlipCommand::COMMAND_NAME = "polyFlip";
+MString PolyMirrorCommand::COMMAND_NAME = "polyMirror";
+MString PolyDeformerWeightsCommand::COMMAND_NAME = "polyDeformerWeights";
 
 MString PolySymmetryContextCmd::COMMAND_NAME = "polySymmetryCtx";
 MString PolySymmetryCommand::COMMAND_NAME = "polySymmetry";
@@ -26,7 +29,8 @@ MString PolySymmetryCommand::COMMAND_NAME = "polySymmetry";
 MString PolySymmetryNode::NODE_NAME = "polySymmetryData";
 MTypeId PolySymmetryNode::NODE_ID = 0x00126b0d;
 
-MString PolyMirrorCommand::COMMAND_NAME = "polyMirror";
+#define REGISTER_COMMAND(CMD) CHECK_MSTATUS_AND_RETURN_IT(fnPlugin.registerCommand(CMD::COMMAND_NAME, CMD::creator, CMD::getSyntax));
+#define DEREGISTER_COMMAND(CMD) CHECK_MSTATUS_AND_RETURN_IT(fnPlugin.deregisterCommand(CMD::COMMAND_NAME))
 
 MStatus initializePlugin(MObject obj)
 {
@@ -53,21 +57,9 @@ MStatus initializePlugin(MObject obj)
 
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = fnPlugin.registerCommand(
-        PolyFlipCommand::COMMAND_NAME,
-        PolyFlipCommand::creator,
-        PolyFlipCommand::getSyntax
-    );
-
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    status = fnPlugin.registerCommand(
-        PolyMirrorCommand::COMMAND_NAME,
-        PolyMirrorCommand::creator,
-        PolyMirrorCommand::getSyntax
-    );
-
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    REGISTER_COMMAND(PolyFlipCommand);
+    REGISTER_COMMAND(PolyMirrorCommand);
+    REGISTER_COMMAND(PolyDeformerWeightsCommand);
 
     status = PolySymmetryCache::initialize();
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -90,13 +82,12 @@ MStatus uninitializePlugin(MObject obj)
 
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = fnPlugin.deregisterCommand(PolyFlipCommand::COMMAND_NAME);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    DEREGISTER_COMMAND(PolyFlipCommand);
+    DEREGISTER_COMMAND(PolyMirrorCommand);
+    DEREGISTER_COMMAND(PolyDeformerWeightsCommand);
 
-    status = fnPlugin.deregisterCommand(PolyMirrorCommand::COMMAND_NAME);
+    status = fnPlugin.deregisterNode(PolySymmetryNode::NODE_ID);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    fnPlugin.deregisterNode(PolySymmetryNode::NODE_ID);
 
     return MS::kSuccess;
 }
