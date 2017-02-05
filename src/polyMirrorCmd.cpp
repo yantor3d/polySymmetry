@@ -121,7 +121,6 @@ MStatus PolyMirrorCommand::redoIt()
     MPoint basePnt;
     MPoint origPnt;
     MPoint newPnt;
-    int o;
 
     for (int i = 0; i < numberOfVertices; i++)
     {
@@ -130,7 +129,7 @@ MStatus PolyMirrorCommand::redoIt()
             newPoints.set(originalPoints[i], i);
         }
 
-        o = vertexSymmetry[i];
+        int o = vertexSymmetry[i];
         newPnt = originalPoints[o];
 
         newPoints.set(i, newPnt.x * -1.0, newPnt.y, newPnt.z);

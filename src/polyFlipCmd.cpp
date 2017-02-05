@@ -170,7 +170,6 @@ MStatus PolyFlipCommand::flipMesh()
     MPointArray newPoints(numberOfVertices);
 
     MPoint pnt;
-    int o;
 
     for (uint i = 0; i < numberOfVertices; i++)
     {
@@ -179,7 +178,7 @@ MStatus PolyFlipCommand::flipMesh()
             newPoints.set(this->originalPoints[i], i);
         }
 
-        o = vertexSymmetry[i];
+        int o = vertexSymmetry[i];
         pnt = this->originalPoints[o];
 
         newPoints.set(i, pnt.x * -1.0, pnt.y, pnt.z);
@@ -219,7 +218,6 @@ MStatus PolyFlipCommand::flipMeshAgainst()
     MPoint pnt;
     MPoint ref;
     MVector delta;
-    int o;
 
     for (uint i = 0; i < numberOfVertices; i++)
     {
@@ -228,7 +226,7 @@ MStatus PolyFlipCommand::flipMeshAgainst()
             newPoints.set(this->originalPoints[i], i);
         }
 
-        o = vertexSymmetry[i];
+        int o = vertexSymmetry[i];
         pnt = this->originalPoints[o];
         ref = referencePoints[o];
 

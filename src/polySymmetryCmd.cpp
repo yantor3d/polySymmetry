@@ -309,13 +309,6 @@ MStatus PolySymmetryCommand::getSelectedMesh(MArgDatabase &argsData)
 }
 
 
-void PolySymmetryCommand::setSelectedMesh(MDagPath &mesh)
-{
-    this->selectedMesh.set(mesh);
-    this->meshData.unpackMesh(mesh);
-}
-
-
 MStatus PolySymmetryCommand::getSymmetryComponents(MArgDatabase &argsData)
 {
     MStatus status;

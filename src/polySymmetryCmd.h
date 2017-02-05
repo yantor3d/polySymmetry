@@ -55,7 +55,6 @@ public:
     virtual MStatus     parseArguments(MArgDatabase &argsData);
 
     virtual MStatus     getSelectedMesh(MArgDatabase &argsData);
-    virtual void        setSelectedMesh(MDagPath &selectedMesh);
 
     virtual MStatus     getSymmetryComponents(MArgDatabase &argsData);
     virtual void        setSymmetryComponents(vector<ComponentSelection> &components);

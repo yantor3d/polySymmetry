@@ -30,15 +30,9 @@ struct ComponentSelection
     pair<int, int> faceIndices;
     pair<int, int> vertexIndices;
 
-    int leftVertexIndex;
+    int leftVertexIndex = -1;
 
-    ComponentSelection() {
-        leftVertexIndex = -1;
-
-        edgeIndices = pair<int, int>(-1, -1);
-        faceIndices = pair<int, int>(-1, -1);
-        vertexIndices = pair<int, int>(-1, -1);
-    }
+    ComponentSelection() {}
 };
 
 void            getSelectedComponents(MDagPath &selectedMesh, MSelectionList &activeSelection, MSelectionList &selection, MFn::Type componentType);

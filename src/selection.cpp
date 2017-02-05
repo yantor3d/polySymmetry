@@ -122,8 +122,6 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
     getSelectedComponentIndices(selection, faceIndices, MFn::kMeshPolygonComponent);
     getSelectedComponentIndices(selection, vertexIndices, MFn::kMeshVertComponent);
 
-    int lastIndexPtr = -1;
-
     int numberOfVerticesSelected = (int) vertexIndices.size();
 
     if (

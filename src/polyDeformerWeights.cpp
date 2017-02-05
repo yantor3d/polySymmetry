@@ -315,13 +315,10 @@ MStatus PolyDeformerWeightsCommand::redoIt()
         PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
         PolySymmetryNode::getValues(fnNode, VERTEX_SIDES, vertexSides);
 
-        float wt;
-        int o;
-
         for (int i = 0; i < numberOfVertices; i++)
         {
-            o = vertexSymmetry[i];
-            wt = sourceWeights[i];
+            int o = vertexSymmetry[i];
+            float wt = sourceWeights[i];
 
             if (flipWeights || (mirrorWeights && vertexSides[i] != direction))
             {

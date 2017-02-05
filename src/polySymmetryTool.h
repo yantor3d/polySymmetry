@@ -57,8 +57,8 @@ private:
     PolySymmetryData            symmetryData;
 
     MColorArray                 originalVertexColors;
-    bool                        originalDisplayColors;
-    bool                        hasVertexColors;
+    bool                        originalDisplayColors = false;
+    bool                        hasVertexColors       = false;
 
     vector<int>                 affectedVertices;
 

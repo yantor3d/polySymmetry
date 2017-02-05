@@ -18,12 +18,7 @@
 
 using namespace std;
 
-MeshData::MeshData()
-{    
-    vertexData = vector<VertexData>();
-    edgeData = vector<EdgeData>();
-    faceData = vector<FaceData>();
-}
+MeshData::MeshData() {}
 
 MeshData::~MeshData()
 {

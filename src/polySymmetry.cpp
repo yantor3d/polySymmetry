@@ -158,21 +158,15 @@ void PolySymmetryData::findFirstSymmetricalVertices(ComponentSelection &selectio
     markSymmetricalVertices(selection.vertexIndices.first, selection.vertexIndices.second);
     markSymmetricalFaces(selection.faceIndices.first, selection.faceIndices.second);
     
-    int vertex0 = -1;
-    int vertex1 = -1;
+    int vertex0 = meshData.edgeData[selection.edgeIndices.first].connectedVertices[0];
+    int vertex1 = meshData.edgeData[selection.edgeIndices.first].connectedVertices[1];
 
-    int nextVertex0 = -1;
-    int nextVertex1 = -1;
-
-    vertex0 = meshData.edgeData[selection.edgeIndices.first].connectedVertices[0];
-    vertex1 = meshData.edgeData[selection.edgeIndices.first].connectedVertices[1];
-
-    nextVertex0 = examinedVertices[vertex0] ? vertex1 : vertex0;
+    int nextVertex0 = examinedVertices[vertex0] ? vertex1 : vertex0;
 
     vertex0 = meshData.edgeData[selection.edgeIndices.second].connectedVertices[0];
     vertex1 = meshData.edgeData[selection.edgeIndices.second].connectedVertices[1];
 
-    nextVertex1 = examinedVertices[vertex0] ? vertex1 : vertex0;
+    int nextVertex1 = examinedVertices[vertex0] ? vertex1 : vertex0;
 
     markSymmetricalVertices(nextVertex0, nextVertex1);
 
@@ -249,21 +243,15 @@ void PolySymmetryData::findSymmetricalVerticesOnFace(pair<int, int> &facePair)
         }
     }
 
-    int vertex0;
-    int vertex1;
-
-    int nextVertex0;
-    int nextVertex1;
-
     while (!faceVerticesQueue.empty())
     {
-        vertex0 = faceVerticesQueue.front();
+        int vertex0 = faceVerticesQueue.front();
         faceVerticesQueue.pop();
 
-        vertex1 = vertexSymmetryIndices[vertex0];
+        int vertex1 = vertexSymmetryIndices[vertex0];
 
-        nextVertex0 = getUnexaminedVertexSibling(vertex0, facePair.first);
-        nextVertex1 = getUnexaminedVertexSibling(vertex1, facePair.second);
+        int nextVertex0 = getUnexaminedVertexSibling(vertex0, facePair.first);
+        int nextVertex1 = getUnexaminedVertexSibling(vertex1, facePair.second);
 
         if (nextVertex0 == -1 || nextVertex1 == -1)
         {
@@ -449,13 +437,10 @@ void PolySymmetryData::finalizeSymmetry()
     int RIGHT = -1;
     int CENTER = 0;
 
-    int sv0;
-    int sv1;
-
     for (int i = 0; i < meshData.numberOfEdges; i++)
     {
-        sv0 = vertexSides[meshData.edgeData[i].connectedVertices[0]];
-        sv1 = vertexSides[meshData.edgeData[i].connectedVertices[1]];
+        int sv0 = vertexSides[meshData.edgeData[i].connectedVertices[0]];
+        int sv1 = vertexSides[meshData.edgeData[i].connectedVertices[1]];
 
         if (sv0 == CENTER && sv1 == CENTER)
         {
@@ -466,9 +451,6 @@ void PolySymmetryData::finalizeSymmetry()
             edgeSides[i] = LEFT;
         }
     }
-
-    bool onTheLeft = false;
-    bool onTheRight = false;
 
     vector<int> faceVertexSides;
 
@@ -481,8 +463,8 @@ void PolySymmetryData::finalizeSymmetry()
             faceVertexSides[j] = vertexSides[meshData.faceData[i].connectedVertices[j]];
         }
 
-        onTheLeft = contains(faceVertexSides, LEFT);
-        onTheRight = contains(faceVertexSides, RIGHT);
+        bool onTheLeft = contains(faceVertexSides, LEFT);
+        bool onTheRight = contains(faceVertexSides, RIGHT);
 
         faceSides[i] = (onTheLeft ? LEFT : CENTER) + (onTheRight ? RIGHT : CENTER);
     }

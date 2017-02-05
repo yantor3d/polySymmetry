@@ -25,13 +25,7 @@
 
 using namespace std;
 
-PolySymmetryTool::PolySymmetryTool() 
-{
-    vector<ComponentSelection> selectedComponents = vector<ComponentSelection>();
-    vector<int> leftSideVertexIndices = vector<int>();
-
-    meshData = MeshData();
-}
+PolySymmetryTool::PolySymmetryTool() {}
 
 PolySymmetryTool::~PolySymmetryTool() 
 {
@@ -41,6 +35,8 @@ PolySymmetryTool::~PolySymmetryTool()
 
 void PolySymmetryTool::toolOnSetup(MEvent &event) 
 {
+    meshData = MeshData();
+
     this->getSelectedMesh();
     this->updateHelpString();
 }
@@ -122,14 +118,14 @@ void PolySymmetryTool::completeAction()
         }
     }
 
-    bool selectionIsComplete = true;
-
     if (continueSelecting)
     {
         this->updateHelpString();
         this->recalculateSymmetry();
         this->updateDisplayColors();
     } else {
+        bool selectionIsComplete = true;
+
         if (!selectedMesh.isValid())
         {
             MGlobal::displayError("Select a mesh to calculate the symmetry of.");
@@ -307,17 +303,11 @@ void PolySymmetryTool::updateDisplayColors()
     MIntArray vertexList(meshData.numberOfVertices);
     MColorArray colors(meshData.numberOfVertices);
 
-    float r = 0.5f;
-    float g = 0.5f;
-    float b = 0.5f;
-
-    int selectionFlag = 0;
-
     for (int i = 0; i < meshData.numberOfVertices; i++)
     {
-        r = 0.5f;
-        g = 0.5f;
-        b = 0.5f;
+        float r = 0.5f;
+        float g = 0.5f;
+        float b = 0.5f;
 
         if (this->symmetryData.vertexSides[i] == 1)
         {
