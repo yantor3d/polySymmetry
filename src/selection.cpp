@@ -144,8 +144,8 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
         vector<int> verticesOnEdge1 = intersection(meshData.edgeData[edgeIndices[1]].connectedVertices, vertexIndices);
 
         bool edgesAreNotOnBorder = edge0NotOnBorder && edge1NotOnBorder;
-        bool edgesAreOnFaces = (edgesOnFace1.size() == 1 && edgesOnFace1.size() == 1 && edgesOnFace0[0] != edgesOnFace1[0]);
-        bool verticesAreOnFaces = (verticesOnFace0.size() == 1 && verticesOnFace0.size() == 1 && verticesOnFace0[0] != verticesOnFace1[0]);
+        bool edgesAreOnFaces = (edgesOnFace0.size() == 1 && edgesOnFace1.size() == 1 && edgesOnFace0[0] != edgesOnFace1[0]);
+        bool verticesAreOnFaces = (verticesOnFace0.size() == 1 && verticesOnFace1.size() == 1 && verticesOnFace0[0] != verticesOnFace1[0]);
         bool verticesAreOnEdges = (verticesOnEdge0.size() == 1 && verticesOnEdge1.size() == 1 && verticesOnEdge0[0] != verticesOnEdge1[0]);
 
         int leftSideVertex = -1;
