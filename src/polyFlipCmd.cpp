@@ -173,11 +173,6 @@ MStatus PolyFlipCommand::flipMesh()
 
     for (uint i = 0; i < numberOfVertices; i++)
     {
-        if (vertexSides[i] == 0)
-        {
-            newPoints.set(this->originalPoints[i], i);
-        }
-
         int o = vertexSymmetry[i];
         pnt = this->originalPoints[o];
 
