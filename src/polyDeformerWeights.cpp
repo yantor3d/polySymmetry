@@ -124,7 +124,7 @@ MStatus PolyDeformerWeightsCommand::getNodeArgument(MArgDatabase &argsData, cons
         selection.add(objectName);
         selection.getDependNode(0, node);
     } else if (required) {
-        MString errorMsg("The ^1s flag is required.")
+        MString errorMsg("The ^1s flag is required.");
         errorMsg.format(errorMsg, MString(flag));
         MGlobal::displayError(errorMsg);
         return MStatus::kFailure;
@@ -152,7 +152,7 @@ MStatus PolyDeformerWeightsCommand::validateArguments()
 {
     MStatus status;
 
-    if (this->direction != 1 && this->direction != 1)
+    if (this->direction != 1 && this->direction != -1)
     {
         MString errorMsg("^1s/^2s flag should be 1 (left to right) or -1 (right to left)");
         errorMsg.format(errorMsg, MString(DIRECTION_LONG_FLAG), MString(DIRECTION_FLAG));
