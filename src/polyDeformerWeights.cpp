@@ -6,9 +6,11 @@
 #include <stdio.h>
 #include <vector>
 
+#include "parseArgs.h"
 #include "polyDeformerWeights.h"
 #include "polySymmetryNode.h"
 #include "sceneCache.h"
+#include "selection.h"
 
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
@@ -91,16 +93,16 @@ MStatus PolyDeformerWeightsCommand::parseArguments(MArgDatabase &argsData)
 {
     MStatus status;
 
-    status = getNodeArgument(argsData, SOURCE_DEFORMER_FLAG, this->sourceDeformer, true);
+    status = parseArgs::getNodeArgument(argsData, SOURCE_DEFORMER_FLAG, this->sourceDeformer, true);
     RETURN_IF_ERROR(status);
 
-    status = getNodeArgument(argsData, DESTINATION_DEFORMER_FLAG, this->destinationDeformer, false);
+    status = parseArgs::getNodeArgument(argsData, DESTINATION_DEFORMER_FLAG, this->destinationDeformer, false);
     RETURN_IF_ERROR(status);
 
-    status = getDagPathArgument(argsData, SOURCE_MESH_FLAG, this->sourceMesh, true);
+    status = parseArgs::getDagPathArgument(argsData, SOURCE_MESH_FLAG, this->sourceMesh, true);
     RETURN_IF_ERROR(status);
 
-    status = getDagPathArgument(argsData, DESTINATION_MESH_FLAG, this->destinationMesh, false);
+    status = parseArgs::getDagPathArgument(argsData, DESTINATION_MESH_FLAG, this->destinationMesh, false);
     RETURN_IF_ERROR(status);
 
     this->mirrorWeights = argsData.isFlagSet(MIRROR_FLAG);
@@ -109,43 +111,6 @@ MStatus PolyDeformerWeightsCommand::parseArguments(MArgDatabase &argsData)
     status = argsData.getFlagArgument(DIRECTION_FLAG, 0, this->direction);
 
     return MStatus::kSuccess;
-}
-
-MStatus PolyDeformerWeightsCommand::getNodeArgument(MArgDatabase &argsData, const char* flag, MObject &node, bool required)
-{
-    MStatus status;
-
-    if (argsData.isFlagSet(flag))
-    {
-        MSelectionList selection;
-        MString objectName;
-
-        argsData.getFlagArgument(flag, 0, objectName);        
-        selection.add(objectName);
-        selection.getDependNode(0, node);
-    } else if (required) {
-        MString errorMsg("The ^1s flag is required.");
-        errorMsg.format(errorMsg, MString(flag));
-        MGlobal::displayError(errorMsg);
-        return MStatus::kFailure;
-    }
-
-    return MStatus::kSuccess; 
-}
-
-MStatus PolyDeformerWeightsCommand::getDagPathArgument(MArgDatabase &argsData, const char* flag, MDagPath &path, bool required)
-{
-    MStatus status;
-
-    MObject obj;
-    status = getNodeArgument(argsData, flag, obj, required);
-
-    if (status)
-    {
-        MDagPath::getAPathTo(obj, path);
-    }
-
-    return MStatus::kSuccess; 
 }
 
 MStatus PolyDeformerWeightsCommand::validateArguments()
@@ -161,7 +126,7 @@ MStatus PolyDeformerWeightsCommand::validateArguments()
         return MStatus::kFailure;
     }
 
-    if (sourceDeformer.isNull() || !sourceDeformer.hasFn(MFn::kWeightGeometryFilt))
+    if (!parseArgs::isNodeType(sourceDeformer, MFn::kWeightGeometryFilt))
     {
         MString errorMsg("A deformer node should be specified with the ^1s/^2s flag.");
         errorMsg.format(errorMsg, MString(SOURCE_DEFORMER_LONG_FLAG), MString(SOURCE_DEFORMER_FLAG));
@@ -181,7 +146,7 @@ MStatus PolyDeformerWeightsCommand::validateArguments()
         return MStatus::kFailure;
     }
 
-    if (sourceMesh.node().isNull() || !sourceMesh.hasFn(MFn::kMesh))
+    if (!parseArgs::isNodeType(this->sourceMesh, MFn::kMesh))
     {
         MString errorMsg("A mesh node should be specified with the ^1s/^2s flag.");
         errorMsg.format(errorMsg, MString(SOURCE_MESH_LONG_FLAG), MString(SOURCE_MESH_FLAG));
@@ -269,8 +234,8 @@ MStatus PolyDeformerWeightsCommand::redoIt()
     MObject sourceComponents;
     MObject destinationComponents;
 
-    this->getAllComponents(this->sourceMesh, sourceComponents);
-    this->getAllComponents(this->destinationMesh, destinationComponents);
+    getAllComponents(this->sourceMesh, sourceComponents);
+    getAllComponents(this->destinationMesh, destinationComponents);
 
     MFloatArray sourceWeights(numberOfVertices);
     MFloatArray destinationWeights(numberOfVertices);
@@ -338,20 +303,6 @@ MStatus PolyDeformerWeightsCommand::redoIt()
     this->components = destinationComponents;
 
     return MStatus::kSuccess;    
-}
-
-void PolyDeformerWeightsCommand::getAllComponents(MDagPath &mesh, MObject &components)
-{
-    MSelectionList selection;
-    MItGeometry itGeo(mesh);
-
-    while (!itGeo.isDone())
-    {
-        selection.add(mesh, itGeo.currentItem(), true);
-        itGeo.next();
-    }
-
-    selection.getDagPath(0, mesh, components);
 }
 
 MStatus PolyDeformerWeightsCommand::undoIt()

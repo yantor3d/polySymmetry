@@ -28,15 +28,10 @@ public:
     virtual MStatus     parseArguments(MArgDatabase &argsData);
     virtual MStatus     validateArguments();
 
-    virtual MStatus     getNodeArgument(MArgDatabase &argsData, const char* flag, MObject &node, bool required);
-    virtual MStatus     getDagPathArgument(MArgDatabase &argsData, const char* flag, MDagPath &path, bool required);
-
     virtual MStatus     doIt(const MArgList& argList);
     virtual MStatus     redoIt();
     virtual MStatus     undoIt();
 
-    virtual void        getAllComponents(MDagPath &mesh, MObject &components);
-    
     virtual bool        isUndoable() const { return true; }
     virtual bool        hasSyntax()  const { return true; }
 
