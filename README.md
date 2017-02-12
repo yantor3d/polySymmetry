@@ -1,4 +1,4 @@
-#### polySymmetry (version 0.0.1)
+#### polySymmetry (version 0.1.0)
 Maya plugin with tools that operate on meshes using symmetry tables calculated by topology. Requires Maya 2016 or later version.
 
 #### Description
