@@ -38,5 +38,6 @@ struct ComponentSelection
 void            getSelectedComponents(MDagPath &selectedMesh, MSelectionList &activeSelection, MSelectionList &selection, MFn::Type componentType);
 void            getSelectedComponentIndices(MSelectionList &activeSelection,  vector<int> &indices, MFn::Type componentType);
 bool            getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &selection,  ComponentSelection &componentSelection, bool leftSideVertexSelected);
+void            getAllComponents(MDagPath &mesh, MObject &components);
 
 #endif
