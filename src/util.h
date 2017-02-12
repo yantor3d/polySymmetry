@@ -3,8 +3,8 @@
     You may use, distribute, or modify this code under the terms of the MIT license.
 */
 
-#ifndef POLYSYMMETRY_UTIL_H
-#define POLYSYMMETRY_UTIL_H
+#ifndef POLY_SYMMETRY_UTIL_H
+#define POLY_SYMMETRY_UTIL_H
 
 #include <algorithm>
 #include <vector>
