@@ -3,3 +3,17 @@ Maya plugin with tools that operate on meshes using symmetry tables calculated b
 
 #### Description
 See the [Wiki](https://github.com/yantor3d/polySymmetry/wiki) for full details.
+
+## Plugin Contents
+### Tools
+- polySymmetryCtx
+
+### Commands
+- polyDeformerWeights
+- polyFlip
+- polyMirror
+- polySkinWeights
+- polySymmetry
+
+### Nodes
+- polySymmetryData
