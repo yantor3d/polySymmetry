@@ -23,13 +23,13 @@
 
 unordered_map<string, MObjectHandle>    PolySymmetryCache::symmetryNodeCache;
 MCallbackIdArray                        PolySymmetryCache::callbackIDs;
-bool                                    PolySymmetryCache::openingFile;
+bool                                    PolySymmetryCache::cacheNodes;
 
 MStatus PolySymmetryCache::initialize() 
 {
     MStatus status;
 
-    PolySymmetryCache::openingFile = false;
+    PolySymmetryCache::cacheNodes = true;
     PolySymmetryCache::symmetryNodeCache = unordered_map<string, MObjectHandle>();
     PolySymmetryCache::callbackIDs = MCallbackIdArray();
 
@@ -73,15 +73,15 @@ MStatus PolySymmetryCache::uninitialize()
     
 void PolySymmetryCache::sceneUpdateCallback(void* clientData) 
 {
-    if (!PolySymmetryCache::openingFile)
+    if (PolySymmetryCache::cacheNodes)
     {
-        PolySymmetryCache::openingFile = true;
+        PolySymmetryCache::cacheNodes = false;
     }
 }
 
 void PolySymmetryCache::nodeAddedCallback(MObject &node, void* clientData)
 {
-    if (!PolySymmetryCache::openingFile)
+    if (PolySymmetryCache::cacheNodes)
     {
         PolySymmetryCache::addNodeToCache(node);
     }
@@ -89,7 +89,7 @@ void PolySymmetryCache::nodeAddedCallback(MObject &node, void* clientData)
 
 void PolySymmetryCache::nodeRemovedCallback(MObject &node, void* clientData)
 {
-    if (PolySymmetryCache::openingFile) { return; }
+    if (!PolySymmetryCache::cacheNodes) { return; }
 
     string key;
     PolySymmetryNode::getCacheKey(node, key);
@@ -107,12 +107,12 @@ void PolySymmetryCache::newFileCallback(void* clientData)
 
 void PolySymmetryCache::beforeOpenFileCallback(void* clientData)
 {
-    PolySymmetryCache::openingFile = true;
+    PolySymmetryCache::cacheNodes = false;
 }
 
 void PolySymmetryCache::afterOpenFileCallback(void* clientData)
 {
-    PolySymmetryCache::openingFile = false;
+    PolySymmetryCache::cacheNodes = true;
 
     PolySymmetryCache::symmetryNodeCache.clear();
 

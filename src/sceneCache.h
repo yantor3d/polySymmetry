@@ -39,7 +39,7 @@ public:
     static unordered_map<string, MObjectHandle>     symmetryNodeCache;
 
     static MCallbackIdArray     callbackIDs;
-    static bool                 openingFile;
+    static bool                 cacheNodes;
 };
 
 #endif

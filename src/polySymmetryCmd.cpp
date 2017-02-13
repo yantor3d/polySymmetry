@@ -185,6 +185,7 @@ MStatus PolySymmetryCommand::doUndoableCommand()
     {
         status = this->createResultNode();
         CHECK_MSTATUS_AND_RETURN_IT(status);
+        
     } else {
         this->createResultString();
     }
@@ -479,7 +480,10 @@ MStatus PolySymmetryCommand::createResultNode()
     meshSymmetryNode = dgModifier.createNode(PolySymmetryNode::NODE_NAME, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    PolySymmetryCache::cacheNodes = false;
     status = dgModifier.doIt();
+    PolySymmetryCache::cacheNodes = true;
+
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     MDGModifier renameModifier;
@@ -516,6 +520,8 @@ MStatus PolySymmetryCommand::createResultNode()
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     this->setResult(fnNode.name());
+
+    PolySymmetryCache::addNodeToCache(meshSymmetryNode);
 
     return MStatus::kSuccess;
 }
