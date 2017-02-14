@@ -33,6 +33,8 @@ components on the shell can have their symmetry computed thus:
       the symmetry of all components on this shell are computed.
 */
 
+// TODO - unintuitive results returned if the mesh does not have a center edge loop whose vertices are symmetrical to themselves.
+
 #include "meshData.h"
 #include "polySymmetry.h"
 #include "selection.h"
@@ -360,7 +362,7 @@ void PolySymmetryData::findVertexSides(vector<int> &leftSideVertexIndices)
 
             for (int &i : meshData.vertexData[vertexIndex].connectedVertices)
             {
-                if (!visitedVertices[i]) 
+                if (!visitedVertices[i] && vertexSymmetryIndices[i] != vertexIndex) 
                 {
                     nextVertexQueue.push(i);
                 }
