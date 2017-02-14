@@ -136,30 +136,36 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
         vector<int> edgesOnFace0 = intersection(meshData.faceData[faceIndices[0]].connectedEdges, edgeIndices);
         vector<int> edgesOnFace1 = intersection(meshData.faceData[faceIndices[1]].connectedEdges, edgeIndices);
 
-        vector<int> verticesOnFace0 = intersection(meshData.faceData[faceIndices[0]].connectedVertices, vertexIndices);
-        vector<int> verticesOnFace1 = intersection(meshData.faceData[faceIndices[1]].connectedVertices, vertexIndices);
-
         vector<int> verticesOnEdge0 = intersection(meshData.edgeData[edgeIndices[0]].connectedVertices, vertexIndices);
         vector<int> verticesOnEdge1 = intersection(meshData.edgeData[edgeIndices[1]].connectedVertices, vertexIndices);
 
-        bool edgesAreNotOnBorder = edge0NotOnBorder && edge1NotOnBorder;
-        bool edgesAreOnFaces = (edgesOnFace0.size() == 1 && edgesOnFace1.size() == 1 && edgesOnFace0[0] != edgesOnFace1[0]);
-        bool verticesAreOnFaces = (verticesOnFace0.size() == 1 && verticesOnFace1.size() == 1 && verticesOnFace0[0] != verticesOnFace1[0]);
-        bool verticesAreOnEdges = (verticesOnEdge0.size() == 1 && verticesOnEdge1.size() == 1 && verticesOnEdge0[0] != verticesOnEdge1[0]);
+        vector<int> verticesOnFace0 = intersection(meshData.faceData[faceIndices[0]].connectedVertices, vertexIndices);
+        vector<int> verticesOnFace1 = intersection(meshData.faceData[faceIndices[1]].connectedVertices, vertexIndices);
 
         int leftSideVertex = -1;
 
         for (int &v : vertexIndices)
         {
-            if (contains(verticesOnFace0, v)) { continue; }
-            if (contains(verticesOnFace1, v)) { continue; }
             if (contains(verticesOnEdge0, v)) { continue; }
             if (contains(verticesOnEdge1, v)) { continue; }
 
             leftSideVertex = v;
+
+            auto it0 = find(verticesOnFace0.begin(), verticesOnFace0.end(), leftSideVertex);
+
+            if (it0 != verticesOnFace0.end()) { verticesOnFace0.erase(it0); }
+
+            auto it1 = find(verticesOnFace1.begin(), verticesOnFace1.end(), leftSideVertex);
+
+            if (it1 != verticesOnFace1.end()) { verticesOnFace1.erase(it1); }
         }
 
         bool leftSideVertexFound = leftSideVertexSelected ? leftSideVertex != -1 : true;
+
+        bool edgesAreNotOnBorder = edge0NotOnBorder && edge1NotOnBorder;
+        bool edgesAreOnFaces = (edgesOnFace0.size() == 1 && edgesOnFace1.size() == 1 && edgesOnFace0[0] != edgesOnFace1[0]);
+        bool verticesAreOnFaces = (verticesOnFace0.size() == 1 && verticesOnFace1.size() == 1 && verticesOnFace0[0] != verticesOnFace1[0]);
+        bool verticesAreOnEdges = (verticesOnEdge0.size() == 1 && verticesOnEdge1.size() == 1 && verticesOnEdge0[0] != verticesOnEdge1[0]);
 
         result = (edgesAreNotOnBorder && edgesAreOnFaces && verticesAreOnFaces && verticesAreOnEdges && leftSideVertexFound);
 
