@@ -85,7 +85,7 @@ MStatus PolyMirrorCommand::doIt(const MArgList& argList)
 
     if (!cacheHit)
     {
-        MString errorMsg("'%s' has not had it's symmetry computed.");
+        MString errorMsg("^1s has not had it's symmetry computed.");
         errorMsg.format(errorMsg, this->targetMesh.partialPathName());
 
         MGlobal::displayError(errorMsg);
