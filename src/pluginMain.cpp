@@ -12,6 +12,7 @@
 #include "sceneCache.h"
 
 #include <maya/MFnPlugin.h>
+#include <maya/MGlobal.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
 #include <maya/MStatus.h>
@@ -33,6 +34,8 @@ MTypeId PolySymmetryNode::NODE_ID                   = 0x00126b0d;
 
 #define REGISTER_COMMAND(CMD) CHECK_MSTATUS_AND_RETURN_IT(fnPlugin.registerCommand(CMD::COMMAND_NAME, CMD::creator, CMD::getSyntax));
 #define DEREGISTER_COMMAND(CMD) CHECK_MSTATUS_AND_RETURN_IT(fnPlugin.deregisterCommand(CMD::COMMAND_NAME))
+
+bool menuCreated = false;
 
 MStatus initializePlugin(MObject obj)
 {
@@ -67,8 +70,22 @@ MStatus initializePlugin(MObject obj)
     status = PolySymmetryCache::initialize();
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    if (MGlobal::mayaState() == MGlobal::kInteractive)
+    {
+        status = MGlobal::executePythonCommand("import polySymmetry");
+
+        if (status) 
+        {
+            MGlobal::executePythonCommand("polySymmetry._initializePlugin()");
+            menuCreated = true;
+        } else {
+            MGlobal::displayWarning("polySymmetry module has not been installed - cannot create a tools menu.");
+        }
+    }
+
     return MS::kSuccess;
 }
+
 
 MStatus uninitializePlugin(MObject obj)
 {
@@ -92,6 +109,16 @@ MStatus uninitializePlugin(MObject obj)
 
     status = fnPlugin.deregisterNode(PolySymmetryNode::NODE_ID);
     CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    if (MGlobal::mayaState() == MGlobal::kInteractive && menuCreated)
+    {
+        status = MGlobal::executePythonCommand("import polySymmetry");
+
+        if (status) 
+        {
+            MGlobal::executePythonCommand("polySymmetry._uninitializePlugin()");
+        }
+    }
 
     return MS::kSuccess;
 }
