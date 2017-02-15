@@ -9,6 +9,10 @@ project(polySymmetry)
     file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h")
     find_package(Maya REQUIRED) 
 
+    if (MAYA_VERSION STRLESS 2016)
+        message(FATAL_ERROR "${PROJECT_NAME} must be compiled with Maya 2016 or newer")
+    endif()
+
     include_directories(${MAYA_INCLUDE_DIR})
     link_directories(${MAYA_LIBRARY_DIR})
 
