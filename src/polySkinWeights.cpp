@@ -24,6 +24,8 @@
 #include <maya/MDoubleArray.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnSkinCluster.h>
+#include <maya/MFnNumericData.h>
+#include <maya/MFnStringData.h>
 #include <maya/MFnWeightGeometryFilter.h>
 #include <maya/MFloatArray.h>
 #include <maya/MGlobal.h>
@@ -40,7 +42,6 @@
 #include <maya/MStringArray.h>
 #include <maya/MStatus.h>
 #include <maya/MSyntax.h>
-#include <maya/MUuid.h>
 
 using namespace std;
  
@@ -63,6 +64,10 @@ using namespace std;
 // Indicates the direction of the mirror or flip action - 1 (left to right) or -1 (right to left)
 #define DIRECTION_FLAG                  "-d"
 #define DIRECTION_LONG_FLAG             "-direction"
+
+// Indicates that the influences on the specified skinCluster should be tagged left/right/center 
+#define INFLUENCE_SYMMETRY_FLAG         "-inf"
+#define INFLUENCE_SYMMETRY_LONG_FLAG    "-influenceSymmetry"
 
 // Indicates that the deformer weights should be mirrored.
 #define MIRROR_FLAG                     "-m"
@@ -107,11 +112,13 @@ MSyntax PolySkinWeightsCommand::getSyntax()
     syntax.setObjectType(MSyntax::kSelectionList, 0, 1);
     syntax.useSelectionAsDefault(true);
 
-    syntax.addFlag(SOURCE_MESH_FLAG, SOURCE_MESH_LONG_FLAG, MSyntax::kSelectionItem);
-    syntax.addFlag(SOURCE_SKIN_FLAG, SOURCE_SKIN_LONG_FLAG, MSyntax::kSelectionItem);
+    syntax.addFlag(SOURCE_MESH_FLAG, SOURCE_MESH_LONG_FLAG, MSyntax::kString);
+    syntax.addFlag(SOURCE_SKIN_FLAG, SOURCE_SKIN_LONG_FLAG, MSyntax::kString);
 
-    syntax.addFlag(DESTINATION_MESH_FLAG, DESTINATION_MESH_LONG_FLAG, MSyntax::kSelectionItem);
-    syntax.addFlag(DESTINATION_SKIN_FLAG, DESTINATION_SKIN_LONG_FLAG, MSyntax::kSelectionItem);
+    syntax.addFlag(DESTINATION_MESH_FLAG, DESTINATION_MESH_LONG_FLAG, MSyntax::kString);
+    syntax.addFlag(DESTINATION_SKIN_FLAG, DESTINATION_SKIN_LONG_FLAG, MSyntax::kString);
+
+    syntax.addFlag(INFLUENCE_SYMMETRY_FLAG, INFLUENCE_SYMMETRY_LONG_FLAG, MSyntax::kString, MSyntax::kString);
 
     syntax.addFlag(DIRECTION_FLAG, DIRECTION_LONG_FLAG, MSyntax::kLong);
     syntax.addFlag(FLIP_FLAG, FLIP_LONG_FLAG);
@@ -119,6 +126,7 @@ MSyntax PolySkinWeightsCommand::getSyntax()
     syntax.addFlag(NORMALIZE_FLAG, NORMALIZE_LONG_FLAG);    
 
     syntax.enableQuery(true);
+    syntax.enableEdit(true);
 
     return syntax;
 }
@@ -145,6 +153,29 @@ MStatus PolySkinWeightsCommand::parseArguments(MArgDatabase &argsData)
     this->mirrorWeights = argsData.isFlagSet(MIRROR_FLAG);
     this->flipWeights = argsData.isFlagSet(FLIP_FLAG);
     this->normalizeWeights = argsData.isFlagSet(NORMALIZE_FLAG);
+
+    return MStatus::kSuccess;
+}
+
+/* Unpack the edit arguments */
+MStatus PolySkinWeightsCommand::parseEditArguments(MArgDatabase &argsData)
+{
+    MStatus status;
+    
+    status = this->parseQueryArguments(argsData);
+    RETURN_IF_ERROR(status);
+
+    if (argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
+    {
+        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 0, this->leftInfluencePattern);
+        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 1, this->rightInfluencePattern);
+    } else {
+        MString errorMsg("^1s/^2s flag is required in edit mode.");
+        errorMsg.format(errorMsg, MString(INFLUENCE_SYMMETRY_LONG_FLAG), MString(INFLUENCE_SYMMETRY_FLAG));
+
+        MGlobal::displayError(errorMsg);
+        return MStatus::kFailure;
+    }
 
     return MStatus::kSuccess;
 }
@@ -331,6 +362,34 @@ MStatus PolySkinWeightsCommand::validateArguments()
 }
 
 /* Validate the query arguments. */
+MStatus PolySkinWeightsCommand::validateEditArguments()
+{
+    MStatus status;
+
+    if (this->sourceSkin.isNull())
+    {
+        MGlobal::displayError("polySkinWeights -edit requires a mesh or skinCluster ");
+        return MStatus::kFailure;
+    }
+
+    if (this->leftInfluencePattern.index('*') == -1 || this->rightInfluencePattern.index('*') == -1)
+    {
+        MString errorMsg("polySkinWeights -edit ^1s/^2s flag expects patterns with wildcards. For example: \"L_*\" \"R_*\"");
+        errorMsg.format(
+            errorMsg,
+            MString(INFLUENCE_SYMMETRY_LONG_FLAG), 
+            MString(INFLUENCE_SYMMETRY_FLAG)
+        );
+
+        MGlobal::displayError(errorMsg);
+
+        return MStatus::kFailure;
+    }
+
+    return MStatus::kSuccess;
+}
+
+/* Validate the query arguments. */
 MStatus PolySkinWeightsCommand::validateQueryArguments()
 {
     MStatus status;
@@ -371,6 +430,7 @@ MStatus PolySkinWeightsCommand::doIt(const MArgList& argList)
     RETURN_IF_ERROR(status);
 
     this->isQuery = argsData.isQuery();
+    this->isEdit = argsData.isEdit();
 
     if (this->isQuery)
     {
@@ -378,6 +438,12 @@ MStatus PolySkinWeightsCommand::doIt(const MArgList& argList)
         RETURN_IF_ERROR(status);
 
         status = this->validateQueryArguments();
+        RETURN_IF_ERROR(status);
+    } else if (this->isEdit) {
+        status = this->parseEditArguments(argsData);
+        RETURN_IF_ERROR(status);
+
+        status = this->validateEditArguments();
         RETURN_IF_ERROR(status);
     } else {
         status = this->parseArguments(argsData);
@@ -396,6 +462,8 @@ MStatus PolySkinWeightsCommand::redoIt()
     if (this->isQuery)
     {
         return this->queryPolySkinWeights();
+    } else if (this->isEdit) {
+        return this->editPolySkinWeights();
     } else {
         return this->copyPolySkinWeights();        
     }
@@ -406,13 +474,13 @@ MStatus PolySkinWeightsCommand::queryPolySkinWeights()
 {
     MStatus status;
 
-    MFnSkinCluster fkSkin(this->sourceSkin);
+    MFnSkinCluster fnSkin(this->sourceSkin);
     MDagPathArray influences;
     vector<string> influenceKeys;
 
-    uint numberOfInfluences = fkSkin.influenceObjects(influences);
+    uint numberOfInfluences = fnSkin.influenceObjects(influences);
    
-    this->getInfluenceKeys(fkSkin, influenceKeys);
+    this->getInfluenceKeys(fnSkin, influenceKeys);
     this->makeInfluenceSymmetryTable(influences, influenceKeys);
 
     MStringArray results;
@@ -437,6 +505,115 @@ MStatus PolySkinWeightsCommand::queryPolySkinWeights()
         pair.format(pair, lhs, rhs);
         
         this->appendToResult(pair);
+    }
+
+    return MStatus::kSuccess;  
+}
+
+/* Do the edit command */
+MStatus PolySkinWeightsCommand::editPolySkinWeights()
+{
+    MStatus status;
+
+    MFnSkinCluster fnSkin(this->sourceSkin);
+    MDagPathArray influences;
+    vector<string> influenceKeys;
+
+    uint numberOfInfluences = fnSkin.influenceObjects(influences);
+    getInfluenceKeys(fnSkin, influenceKeys);
+   
+    // TODO: replace with actual C++ code.
+    
+    status = MGlobal::executePythonCommand("import fnmatch");
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    MString leftTokenCmd("'^1s'.replace('*', '').replace('$', '')");
+    leftTokenCmd.format(leftTokenCmd, leftInfluencePattern);
+
+    MString rightTokenCmd("'^1s'.replace('*', '').replace('$', '')");
+    rightTokenCmd.format(rightTokenCmd, rightInfluencePattern);
+
+    MString leftToken;
+    MString rightToken;
+
+    status = MGlobal::executePythonCommand(leftTokenCmd, leftToken);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = MGlobal::executePythonCommand(rightTokenCmd, rightToken);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    for (uint i = 0; i < numberOfInfluences; i++)
+    {
+        MString influenceName = influences[i].partialPathName();
+
+        if (!influences[i].hasFn(MFn::kJoint))
+        {
+            MGlobal::displayWarning("Cannot set " + influenceName + " .side, .type, and .otherType attributes because it is not a joint.");
+            continue;
+        }
+
+        int leftMatch = 0;
+        int rightMatch = 0;
+
+        MString leftMatchCmd("fnmatch.fnmatch('^1s', '^2s')");
+        leftMatchCmd.format(leftMatchCmd, influenceName, leftInfluencePattern);
+
+        MString rightMatchCmd("fnmatch.fnmatch('^1s', '^2s')");
+        rightMatchCmd.format(rightMatchCmd, influenceName, rightInfluencePattern);
+
+        status = MGlobal::executePythonCommand(leftMatchCmd, leftMatch);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        status = MGlobal::executePythonCommand(rightMatchCmd, rightMatch);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        MString replaceTokenCmd("'^1s'.replace('^2s', '')");
+        
+        if (leftMatch == 1)
+        {
+            replaceTokenCmd.format(replaceTokenCmd, influenceName, leftToken);
+            status = MGlobal::executePythonCommand(replaceTokenCmd, influenceName);
+            CHECK_MSTATUS_AND_RETURN_IT(status);
+        } else if (rightMatch == 1) {
+            replaceTokenCmd.format(replaceTokenCmd, influenceName, rightToken);
+            status = MGlobal::executePythonCommand(replaceTokenCmd, influenceName);
+            CHECK_MSTATUS_AND_RETURN_IT(status);
+        }
+
+        JointLabel oldJointLabel = getJointLabel(influences[i]);
+        influenceLabels.emplace(influenceKeys[i], oldJointLabel);
+
+        JointLabel newJointLabel;
+
+        newJointLabel.type = OTHER_TYPE;
+        newJointLabel.otherType = influenceName;
+
+        if (leftMatch == 1)
+        { 
+            newJointLabel.side = LEFT_SIDE;
+        } else if (rightMatch == 1) {
+            newJointLabel.side = RIGHT_SIDE;
+        } else {
+            newJointLabel.side = CENTER_SIDE;
+        }
+        
+        setJointLabel(influences[i], newJointLabel);
+    }
+
+    this->makeInfluenceSymmetryTable(influences, influenceKeys);
+    bool symmetryIsSet = this->checkInfluenceSymmetryTable();
+
+    if (!symmetryIsSet)
+    {
+        MString warning("Influences for '^1s' were not configured. Check your arguments for the ^2s/^3s flag and try again..");
+        warning.format(
+            warning, 
+            fnSkin.name(), 
+            MString(INFLUENCE_SYMMETRY_LONG_FLAG),
+            MString(INFLUENCE_SYMMETRY_FLAG)
+        );
+
+        MGlobal::displayWarning(warning);
     }
 
     return MStatus::kSuccess;  
@@ -478,6 +655,25 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     getAllComponents(destinationMesh, destinationComponents);
 
     this->makeInfluenceSymmetryTable(destinationInfluences, destinationInfluenceKeys);
+
+    bool symmetryIsSet = this->checkInfluenceSymmetryTable();
+
+    if (!symmetryIsSet)
+    {
+        MString verboseWarning(
+            "All joint influence's have the the same side/type/otherType attribute values. "
+            "Run 'polySymmetry -edit -^1s \"[LEFT PATTERN]\" \"[RIGHT PATTERN]\"' to auto-configure the influences."
+        );
+
+        MString warning("Influences for '^1s' are not configured. See script editor for details.");
+
+        verboseWarning.format(verboseWarning, MString(INFLUENCE_SYMMETRY_LONG_FLAG));
+        warning.format(warning, fnDestinationSkin.name());
+
+        MGlobal::displayWarning(verboseWarning);
+        MGlobal::displayWarning(warning);
+    }
+    
     this->makeWeightTables(destinationInfluenceKeys);
 
     status = fnSourceSkin.getWeights(sourceMesh, sourceComponents, sourceInfluenceIndices, sourceWeights);
@@ -654,6 +850,23 @@ MStatus PolySkinWeightsCommand::makeInfluenceSymmetryTable(MDagPathArray &influe
     return MStatus::kSuccess;
 }
 
+/* Confirm that at least one pair of influences are symmetrical to each other. */
+bool PolySkinWeightsCommand::checkInfluenceSymmetryTable()
+{
+    bool result = false;
+
+    for (auto it = this->influenceSymmetry.begin(); it != this->influenceSymmetry.end(); ++it)
+    {
+        if (it->first != it->second)
+        {
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+
 
 /* Constructs a pair of maps (influence->weights) from the influences of the desination skin cluster. */
 void PolySkinWeightsCommand::makeWeightTables(vector<string> &influenceKeys) 
@@ -745,7 +958,7 @@ MStatus PolySkinWeightsCommand::getInfluenceKeys(MFnSkinCluster &fnSkin, vector<
 
     for (uint i = 0; i < numberOfInfluences; i++)
     {
-        string key = string(MFnDependencyNode(influences[i].node()).uuid().asString().asChar());
+        string key = string(influences[i].fullPathName().asChar());
         influenceKeys[i] = key;
     }
 
@@ -904,8 +1117,54 @@ JointLabel PolySkinWeightsCommand::getJointLabel(MDagPath &influence)
     return result;
 }
 
+MStatus PolySkinWeightsCommand::setJointLabel(MDagPath &influence, JointLabel &jointLabel)
+{
+    MStatus status;
+
+    MFnDependencyNode fnNode(influence.node());
+
+    MPlug sidePlug = fnNode.findPlug("side", false, &status);
+    if (status) 
+    {
+        status = sidePlug.setValue(jointLabel.side);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    } else {
+        CHECK_MSTATUS(status);
+    }
+
+    MPlug typePlug = fnNode.findPlug("type", false, &status);
+    if (status) 
+    {
+        status = typePlug.setValue(jointLabel.type);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    } else {
+        CHECK_MSTATUS(status);
+    }            
+
+    MPlug otherTypePlug = fnNode.findPlug("otherType", false, &status); 
+    if (status) 
+    {
+        status = otherTypePlug.setValue(jointLabel.otherType);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    } else {
+        CHECK_MSTATUS(status);
+    }
+    
+    return MStatus::kSuccess;
+}
+
 
 MStatus PolySkinWeightsCommand::undoIt()
+{
+    if (this->isEdit)
+    {
+        return this->undoEditPolySkinWeights();
+    } else {
+        return this->undoCopyPolySkinWeights();
+    }
+}
+
+MStatus PolySkinWeightsCommand::undoCopyPolySkinWeights()
 {
     MStatus status;
 
@@ -927,6 +1186,31 @@ MStatus PolySkinWeightsCommand::undoIt()
     status = dgModifier.undoIt();
 
     CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    return MStatus::kSuccess;
+}
+
+MStatus PolySkinWeightsCommand::undoEditPolySkinWeights()
+{
+    MStatus status;
+
+    MFnSkinCluster fnSkin(this->sourceSkin);
+
+    MDagPathArray influences;
+    vector<string> influenceKeys;
+
+    uint numberOfInfluences = fnSkin.influenceObjects(influences);
+    getInfluenceKeys(fnSkin, influenceKeys);
+
+    for (uint i = 0; i < numberOfInfluences; i++)
+    {
+        auto got = influenceLabels.find(influenceKeys[i]);
+
+        if (got != influenceLabels.end())
+        {
+            setJointLabel(influences[i], influenceLabels[influenceKeys[i]]);
+        }
+    }
 
     return MStatus::kSuccess;
 }

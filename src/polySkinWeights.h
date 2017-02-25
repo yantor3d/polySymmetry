@@ -46,25 +46,34 @@ public:
     static MSyntax      getSyntax();
 
     virtual MStatus     parseArguments(MArgDatabase &argsData);
+    virtual MStatus     parseEditArguments(MArgDatabase &argsData);
     virtual MStatus     parseQueryArguments(MArgDatabase &argsData);
 
     virtual MStatus     validateArguments();
+    virtual MStatus     validateEditArguments();
     virtual MStatus     validateQueryArguments();
+
     virtual bool        isDeformedBy(MObject &skin, MDagPath &mesh);
 
     virtual MStatus     doIt(const MArgList& argList);
     virtual MStatus     redoIt();
     virtual MStatus     undoIt();
 
-    virtual MStatus     queryPolySkinWeights();
     virtual MStatus     copyPolySkinWeights();
+    virtual MStatus     editPolySkinWeights();
+    virtual MStatus     queryPolySkinWeights();
+
+    virtual MStatus     undoCopyPolySkinWeights();
+    virtual MStatus     undoEditPolySkinWeights();
+
     virtual void        copyWeightsTable(vector<string> &influenceKeys);
     virtual void        flipWeightsTable(vector<string> &influenceKeys);
     virtual void        mirrorWeightsTable(vector<string> &influenceKeys);
 
     virtual MStatus     makeInfluencesMatch(MFnSkinCluster &fnSourceSkin, MFnSkinCluster &fnDestinationSkin);
     virtual MStatus     makeInfluenceSymmetryTable(MDagPathArray &influences, vector<string> &influenceKeys);
-
+    virtual bool        checkInfluenceSymmetryTable();
+    
     virtual void        makeWeightTables(vector<string> &influenceKeys);
     virtual void        setWeightsTable(unordered_map<string, vector<double>> &weightTable, MDoubleArray &weights, vector<string> &influenceKeys);
     virtual void        getWeightsTable(unordered_map<string, vector<double>> &weightTable, MDoubleArray &weights, vector<string> &influenceKeys);
@@ -73,6 +82,7 @@ public:
     virtual MStatus     getInfluenceKeys(MFnSkinCluster &fnSkin, vector<string> &influenceKeys);
 
     virtual JointLabel  getJointLabel(MDagPath &influence);
+    virtual MStatus     setJointLabel(MDagPath &influence, JointLabel &jointLabel);
 
     virtual bool        isUndoable() const;
     virtual bool        hasSyntax()  const { return true; }
@@ -88,10 +98,15 @@ private:
     bool                flipWeights   = false;
 
     bool                isQuery = false;
+    bool                isEdit = false;
 
     uint                numberOfVertices;
+
+    MString             leftInfluencePattern;
+    MString             rightInfluencePattern;
     
     unordered_map<string, string>         influenceSymmetry;
+    unordered_map<string, JointLabel>     influenceLabels;
     unordered_map<string, vector<double>> oldWeights;
     unordered_map<string, vector<double>> newWeights;
 
