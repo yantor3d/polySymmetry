@@ -6,7 +6,8 @@ cmake_minimum_required(VERSION 2.6)
 set(CMAKE_MODULE_PATH "$ENV{CMAKE_MODULE_PATH}")
     
 project(polySymmetry)   
-    file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h")
+    file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h" "pystring/pystring.*")
+
     find_package(Maya REQUIRED) 
 
     if (WIN32)

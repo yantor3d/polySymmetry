@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <regex>
 #include <stdio.h>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -16,6 +18,8 @@
 #include "polySymmetryNode.h"
 #include "sceneCache.h"
 #include "selection.h"
+
+#include "../pystring/pystring.h"
 
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
@@ -167,8 +171,13 @@ MStatus PolySkinWeightsCommand::parseEditArguments(MArgDatabase &argsData)
 
     if (argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
     {
-        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 0, this->leftInfluencePattern);
-        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 1, this->rightInfluencePattern);
+        MString leftInfluencePatternArg;
+        MString rightInfluencePatternArg;
+        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 0, leftInfluencePatternArg);
+        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 1, rightInfluencePatternArg);
+
+        leftInfluencePattern = string(leftInfluencePatternArg.asChar());
+        rightInfluencePattern = string(rightInfluencePatternArg.asChar());
     } else {
         MString errorMsg("^1s/^2s flag is required in edit mode.");
         errorMsg.format(errorMsg, MString(INFLUENCE_SYMMETRY_LONG_FLAG), MString(INFLUENCE_SYMMETRY_FLAG));
@@ -385,17 +394,24 @@ MStatus PolySkinWeightsCommand::validateEditArguments()
         return MStatus::kFailure;
     }
 
-    if (this->leftInfluencePattern.index('*') == -1 || this->rightInfluencePattern.index('*') == -1)
+    bool leftPatternIsValid = pystring::index(leftInfluencePattern, string("*")) != -1;
+    bool rightPatternIsValid = pystring::index(rightInfluencePattern, string("*")) != -1;
+
+    if (!leftPatternIsValid || !rightPatternIsValid)
     {
-        MString errorMsg("polySkinWeights -edit ^1s/^2s flag expects patterns with wildcards. For example: \"L_*\" \"R_*\"");
+        MString errorMsg(
+            "`polySkinWeights -edit ^1s \"^2s\" \"^3s\"` - "
+            "patterns must have at least one '*' wildcard."
+        );
+
         errorMsg.format(
             errorMsg,
             MString(INFLUENCE_SYMMETRY_LONG_FLAG), 
-            MString(INFLUENCE_SYMMETRY_FLAG)
+            MString(leftInfluencePattern.c_str()),
+            MString(rightInfluencePattern.c_str())
         );
 
         MGlobal::displayError(errorMsg);
-
         return MStatus::kFailure;
     }
 
@@ -535,81 +551,59 @@ MStatus PolySkinWeightsCommand::editPolySkinWeights()
     uint numberOfInfluences = fnSkin.influenceObjects(influences);
     getInfluenceKeys(fnSkin, influenceKeys);
    
-    // TODO: replace with actual C++ code.
-    
-    status = MGlobal::executePythonCommand("import fnmatch");
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    string wildcard = string("*");
+    string regexAny = string(".*");
+    string emptyString = string("");
 
-    MString leftTokenCmd("'^1s'.replace('*', '').replace('$', '')");
-    leftTokenCmd.format(leftTokenCmd, leftInfluencePattern);
+    string leftToken = pystring::replace(leftInfluencePattern, regexAny, emptyString);
+    string rightToken = pystring::replace(rightInfluencePattern, regexAny, emptyString);
 
-    MString rightTokenCmd("'^1s'.replace('*', '').replace('$', '')");
-    rightTokenCmd.format(rightTokenCmd, rightInfluencePattern);
+    leftToken = pystring::replace(leftToken, wildcard, emptyString);
+    rightToken = pystring::replace(rightToken, wildcard, emptyString);
 
-    MString leftToken;
-    MString rightToken;
+    string leftRegexPattern = pystring::replace(leftInfluencePattern, regexAny, wildcard);
+    string rightRegexPattern = pystring::replace(rightInfluencePattern, regexAny, wildcard);
 
-    status = MGlobal::executePythonCommand(leftTokenCmd, leftToken);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    leftRegexPattern = pystring::replace(leftRegexPattern, wildcard, regexAny);
+    rightRegexPattern = pystring::replace(rightRegexPattern, wildcard, regexAny);
 
-    status = MGlobal::executePythonCommand(rightTokenCmd, rightToken);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    regex leftRegex(leftRegexPattern);
+    regex rightRegex(rightRegexPattern);
 
     for (uint i = 0; i < numberOfInfluences; i++)
     {
-        MString influenceName = influences[i].partialPathName();
+        MString influencePathName = influences[i].partialPathName();
+        string influenceName(influencePathName.asChar());
 
         if (!influences[i].hasFn(MFn::kJoint))
         {
-            MGlobal::displayWarning("Cannot set " + influenceName + " .side, .type, and .otherType attributes because it is not a joint.");
+            MString warning("Cannot set '^1s' .side, .type, and .otherType attributes because it is not a joint.");
+            warning.format(warning, influencePathName);
+
+            MGlobal::displayWarning(warning);
             continue;
         }
 
-        int leftMatch = 0;
-        int rightMatch = 0;
-
-        MString leftMatchCmd("fnmatch.fnmatch('^1s', '^2s')");
-        leftMatchCmd.format(leftMatchCmd, influenceName, leftInfluencePattern);
-
-        MString rightMatchCmd("fnmatch.fnmatch('^1s', '^2s')");
-        rightMatchCmd.format(rightMatchCmd, influenceName, rightInfluencePattern);
-
-        status = MGlobal::executePythonCommand(leftMatchCmd, leftMatch);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        status = MGlobal::executePythonCommand(rightMatchCmd, rightMatch);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        MString replaceTokenCmd("'^1s'.replace('^2s', '')");
-        
-        if (leftMatch == 1)
-        {
-            replaceTokenCmd.format(replaceTokenCmd, influenceName, leftToken);
-            status = MGlobal::executePythonCommand(replaceTokenCmd, influenceName);
-            CHECK_MSTATUS_AND_RETURN_IT(status);
-        } else if (rightMatch == 1) {
-            replaceTokenCmd.format(replaceTokenCmd, influenceName, rightToken);
-            status = MGlobal::executePythonCommand(replaceTokenCmd, influenceName);
-            CHECK_MSTATUS_AND_RETURN_IT(status);
-        }
-
-        JointLabel oldJointLabel = getJointLabel(influences[i]);
-        influenceLabels.emplace(influenceKeys[i], oldJointLabel);
-
         JointLabel newJointLabel;
 
-        newJointLabel.type = OTHER_TYPE;
-        newJointLabel.otherType = influenceName;
+        bool isLeft = regex_match(influenceName, leftRegex);
+        bool isRight = regex_match(influenceName, rightRegex);
 
-        if (leftMatch == 1)
-        { 
+        if (isLeft) 
+        {
+            influenceName = pystring::replace(influenceName, leftToken, emptyString);
             newJointLabel.side = LEFT_SIDE;
-        } else if (rightMatch == 1) {
-            newJointLabel.side = RIGHT_SIDE;
+        } else if (isRight) {
+            influenceName = pystring::replace(influenceName, rightToken, emptyString);
+            newJointLabel.side = RIGHT_SIDE;            
         } else {
             newJointLabel.side = CENTER_SIDE;
         }
-        
+
+        newJointLabel.type = OTHER_TYPE;
+        newJointLabel.otherType = MString(influenceName.c_str());
+
+        influenceLabels.emplace(influenceKeys[i], getJointLabel(influences[i]));        
         setJointLabel(influences[i], newJointLabel);
     }
 

@@ -1,0 +1,3 @@
+[submodule "pystring"]
+	path = pystring
+	url = https://github.com/imageworks/pystring.git

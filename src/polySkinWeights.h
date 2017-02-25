@@ -102,8 +102,8 @@ private:
 
     uint                numberOfVertices;
 
-    MString             leftInfluencePattern;
-    MString             rightInfluencePattern;
+    string              leftInfluencePattern;
+    string              rightInfluencePattern;
     
     unordered_map<string, string>         influenceSymmetry;
     unordered_map<string, JointLabel>     influenceLabels;
