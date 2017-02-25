@@ -193,6 +193,19 @@ MStatus PolySkinWeightsCommand::parseQueryArguments(MArgDatabase &argsData)
 
     status = selection.getDagPath(0, dagPath);
 
+    if (!argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
+    {
+        MString errorMsg("The ^1s\^2s flag is required in query mode.");
+        errorMsg.format(
+            errorMsg, 
+            MString(INFLUENCE_SYMMETRY_LONG_FLAG),
+            MString(INFLUENCE_SYMMETRY_FLAG)
+        );
+
+        MGlobal::displayError(errorMsg);
+        return MStatus::kFailure;
+    }
+
     if (status && parseArgs::isNodeType(dagPath, MFn::kMesh))
     {
         if (!dagPath.node().hasFn(MFn::kMesh))
