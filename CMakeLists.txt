@@ -9,6 +9,12 @@ project(polySymmetry)
     file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h")
     find_package(Maya REQUIRED) 
 
+    if (WIN32)
+    elseif(APPLE)
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    endif()
+
     include_directories(${MAYA_INCLUDE_DIR})
     link_directories(${MAYA_LIBRARY_DIR})
 
