@@ -204,7 +204,7 @@ MStatus PolySkinWeightsCommand::parseQueryArguments(MArgDatabase &argsData)
 
     if (!argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
     {
-        MString errorMsg("The ^1s\^2s flag is required in query mode.");
+        MString errorMsg("The ^1s/^2s flag is required in query mode.");
         errorMsg.format(
             errorMsg, 
             MString(INFLUENCE_SYMMETRY_LONG_FLAG),
@@ -306,6 +306,75 @@ MStatus PolySkinWeightsCommand::validateArguments()
         }
     }
 
+    // Source/destination mesh must have polySymmetryData cached if the weights are going to be mirrored or flipped.
+    if (mirrorWeights || flipWeights)
+    {
+        bool cacheHit = PolySymmetryCache::getNodeFromCache(this->sourceMesh, this->polySymmetryData);
+
+        if (!cacheHit)
+        {
+            MString errorMsg("Mesh specified with the ^1s/^2s flag must have an associated ^3s node.");
+            errorMsg.format(errorMsg, MString(SOURCE_MESH_LONG_FLAG), MString(SOURCE_MESH_FLAG), PolySymmetryNode::NODE_NAME);
+
+            MGlobal::displayError(errorMsg);
+            return MStatus::kFailure;
+        }
+    }
+    
+    this->numberOfVertices = MFnMesh(sourceMesh).numVertices();
+
+    MSelectionList activeSelection;
+    MSelectionList vertexSelection;
+
+    MGlobal::getActiveSelectionList(activeSelection);
+
+    if (destinationMesh.node().hasFn(MFn::kMesh)) { destinationMesh.pop(); }
+    getSelectedComponents(destinationMesh, activeSelection, vertexSelection, MFn::Type::kMeshVertComponent);
+
+    MObject selectedVertices;
+
+    if (!vertexSelection.isEmpty())
+    {
+        vertexSelection.getDagPath(0, destinationMesh, selectedVertices);
+    }
+
+    MItGeometry itGeo(destinationMesh, selectedVertices);
+    uint numSelectedVertices = itGeo.exactCount();
+
+    vector<bool> vertexIsSelected(numberOfVertices);
+    selectedVertexIndices.resize(numberOfVertices, -1);
+
+    int idx = 0;
+
+    while (!itGeo.isDone())
+    {
+        int i = itGeo.index();
+        selectedVertexIndices[idx++] = i;
+        vertexIsSelected[i] = true;
+        itGeo.next();
+    }
+
+    if (!selectedVertices.isNull() && !polySymmetryData.isNull())
+    {
+        vector<int> vertexSymmetry;
+
+        MFnDependencyNode fnNode(this->polySymmetryData);
+        PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
+
+        for (uint i = 0; i < numSelectedVertices; i++)
+        {
+            int v = selectedVertexIndices[i];
+            int sv = vertexSymmetry[v];
+
+            if (!vertexIsSelected[sv])
+            {
+                selectedVertexIndices[idx++] = sv;
+            }
+        }
+    }
+
+    selectedVertexIndices.resize(idx);
+
     if (!sourceMesh.node().hasFn(MFn::kMesh))
     {
         sourceMesh.extendToShapeDirectlyBelow(0);
@@ -363,21 +432,6 @@ MStatus PolySkinWeightsCommand::validateArguments()
 
         MGlobal::displayError(errorMsg);
         return MStatus::kFailure;
-    }
-
-    // Source/destination mesh must have polySymmetryData cached if the weights are going to be mirrored or flipped.
-    if (mirrorWeights || flipWeights)
-    {
-        bool cacheHit = PolySymmetryCache::getNodeFromCache(this->sourceMesh, this->polySymmetryData);
-
-        if (!cacheHit)
-        {
-            MString errorMsg("Mesh specified with the ^1s/^2s flag must have an associated ^3s node.");
-            errorMsg.format(errorMsg, MString(SOURCE_MESH_LONG_FLAG), MString(SOURCE_MESH_FLAG), PolySymmetryNode::NODE_NAME);
-
-            MGlobal::displayError(errorMsg);
-            return MStatus::kFailure;
-        }
     }
 
     return MStatus::kSuccess;
@@ -649,8 +703,6 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     MDoubleArray    destinationWeights;
     uint            numDestinationInfluences;
 
-    this->numberOfVertices = MFnMesh(sourceMesh).numVertices();
-
     numSourceInfluences = fnSourceSkin.influenceObjects(sourceInfluences);
     this->getInfluenceIndices(fnSourceSkin, sourceInfluenceIndices);
     this->getInfluenceKeys(fnSourceSkin, sourceInfluenceKeys);
@@ -683,7 +735,20 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     
     this->makeWeightTables(destinationInfluenceKeys);
 
-    status = fnSourceSkin.getWeights(sourceMesh, sourceComponents, sourceInfluenceIndices, sourceWeights);
+    status = fnSourceSkin.getWeights(
+        sourceMesh, 
+        sourceComponents, 
+        sourceInfluenceIndices, 
+        sourceWeights
+    );
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = fnDestinationSkin.getWeights(
+        destinationMesh, 
+        destinationComponents, 
+        destinationInfluenceIndices, 
+        destinationWeights
+    );
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     this->setWeightsTable(this->oldWeights, sourceWeights, sourceInfluenceKeys);
@@ -911,7 +976,7 @@ void PolySkinWeightsCommand::getWeightsTable(unordered_map<string, vector<double
 
     weights.setLength(this->numberOfVertices * numberOfInfluences);
 
-    for (uint i = 0; i < this->numberOfVertices; i++)
+    for (int i : selectedVertexIndices)
     {
         for (uint j = 0; j < numberOfInfluences; j++)
         {
@@ -994,10 +1059,12 @@ void PolySkinWeightsCommand::flipWeightsTable(vector<string> &influenceKeys)
 
     for (string ii : influenceKeys)
     {
-        for (uint i = 0; i < numberOfVertices; i++)
+        for (int i : selectedVertexIndices)
         {
             int o = vertexSymmetry[i];
+
             newWeights[ii][i] = oldWeights[ii][o];
+            newWeights[ii][o] = oldWeights[ii][i];
         }
     }
 }
@@ -1014,17 +1081,18 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
     
     for (string ii : influenceKeys)
     {
-        for (uint i = 0; i < numberOfVertices; i++)
+        if (newWeights.find(ii) == newWeights.end())
         {
-            if (newWeights.find(ii) == newWeights.end())
-            {
-                continue;
-            }
+            continue;
+        }
 
-            if (vertexSides[i] == 0)
-            {
-                string oi = influenceSymmetry[ii];
+        for (int i : selectedVertexIndices)
+        {
+            int o = vertexSymmetry[i];
+            string oi = influenceSymmetry[ii];
 
+            if (vertexSides[i] == CENTER_SIDE)
+            {
                 if (oldWeights.find(oi) != oldWeights.end() && ii != oi)
                 {
                     newWeights[ii][i] = oldWeights[ii][i];
@@ -1035,9 +1103,6 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
             } else if (vertexSides[i] == direction) {
                 newWeights[ii][i] = oldWeights[ii][i];
             } else {
-                int o = vertexSymmetry[i];
-                string oi = influenceSymmetry[ii];
-
                 if (oldWeights.find(oi) != oldWeights.end()) 
                 {
                     newWeights[ii][i] = oldWeights[oi][o];
@@ -1048,7 +1113,7 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
         }
     }
 
-    for (uint i = 0; i < numberOfVertices; i++)
+    for (int i : selectedVertexIndices)
     {
         double centerWeightMax = 0.0;
         double centerWeights = 0.0;
@@ -1098,7 +1163,6 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
         }
     }
 }
-
 
 /* Return the side, type, and otherType values for the given influence. */
 JointLabel PolySkinWeightsCommand::getJointLabel(MDagPath &influence)

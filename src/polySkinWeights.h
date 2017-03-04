@@ -110,6 +110,8 @@ private:
     unordered_map<string, vector<double>> oldWeights;
     unordered_map<string, vector<double>> newWeights;
 
+    vector<int>         selectedVertexIndices;
+    
     MDGModifier         dgModifier;
     MDoubleArray        oldWeightValues;
 
