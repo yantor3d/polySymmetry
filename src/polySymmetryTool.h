@@ -14,6 +14,7 @@
 #include <maya/MColor.h>
 #include <maya/MColorArray.h>
 #include <maya/MDagPath.h>
+#include <maya/MDGModifier.h>
 #include <maya/MEvent.h>
 #include <maya/MPxContext.h>
 #include <maya/MPxContextCommand.h>
@@ -58,8 +59,8 @@ private:
 
     MColorArray                 originalVertexColors;
     bool                        originalDisplayColors = false;
-    bool                        hasVertexColors       = false;
 
+    MDGModifier                 displayColorModifier;
     vector<int>                 affectedVertices;
 
     vector<ComponentSelection>  selectedComponents;

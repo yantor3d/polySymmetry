@@ -77,6 +77,7 @@ void PolySymmetryTool::deleteAction()
 
 void PolySymmetryTool::abortAction()
 {
+    this->clearSelectedMesh();
     MGlobal::executeCommand("escapeCurrentTool");
 }
 
@@ -224,8 +225,6 @@ MStatus PolySymmetryTool::getSelectedMesh()
         MFnMesh meshFn(selectedMesh);
 
         status = meshFn.getVertexColors(originalVertexColors);
-        hasVertexColors = status == MStatus::kSuccess;
-
         meshFn.clearColors();
 
         MPlug displayColorsPlug = meshFn.findPlug("displayColors");
@@ -250,15 +249,6 @@ MStatus PolySymmetryTool::clearSelectedMesh()
     if (selectedMesh.isValid())
     {
         MFnMesh meshFn(selectedMesh);
-
-        if (hasVertexColors)
-        {
-            MIntArray vertexList(meshData.numberOfVertices);
-            for (int i = 0; i < meshData.numberOfVertices; i++) { vertexList.set(i, i); }
-
-            status = meshFn.setVertexColors(originalVertexColors, vertexList);;
-            CHECK_MSTATUS_AND_RETURN_IT(status);
-        }
         
         status = meshFn.findPlug("displayColors").setBool(originalDisplayColors);
         CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -266,6 +256,9 @@ MStatus PolySymmetryTool::clearSelectedMesh()
         selectedMesh.set(MDagPath());
         meshData.clear();
     }    
+
+    status = displayColorModifier.undoIt();
+    CHECK_MSTATUS_AND_RETURN_IT(status);
 
     return MStatus::kSuccess;
 
@@ -321,7 +314,7 @@ void PolySymmetryTool::updateDisplayColors()
     }
 
     MFnMesh meshFn(selectedMesh);
-    meshFn.setVertexColors(colors, vertexList);
+    meshFn.setVertexColors(colors, vertexList, &displayColorModifier);
 }
 
 PolySymmetryContextCmd::PolySymmetryContextCmd() {}
