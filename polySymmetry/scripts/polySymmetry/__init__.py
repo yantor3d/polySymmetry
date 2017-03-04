@@ -5,8 +5,8 @@ called when the plugin is un/loaded to create the polySymmetry tools menu.
 
 """
 
-import polySymmetry.commands
-import polySymmetry.tools
+import polySymmetry.commands as _cmds
+import polySymmetry.tools as _tools
 
 from maya.api import OpenMaya
 from maya import cmds 
@@ -43,10 +43,6 @@ class _MenuItem(object):
             OpenMaya.MGlobal.displayError(str(e))
 
 
-_tools = polySymmetry.tools 
-_cmds = polySymmetry.commands 
-
-
 _POLY_SYMMETRY_MENU_ITEMS = (
     _MenuItem('Poly Symmetry Tool', _tools.polySymmetryTool),
     None,
@@ -59,6 +55,10 @@ _POLY_SYMMETRY_MENU_ITEMS = (
     None,    
     _MenuItem("Copy Poly Skin Weights", _cmds.copyPolySkinWeights),
     _MenuItem("Mirror Poly Skin Weights", _cmds.mirrorPolySkinWeights),
+    None,
+    _MenuItem("Set Influence Symmetry", _cmds.setInfluenceSymmetry),
+    _MenuItem("Print Influence Symmetry", _cmds.printInfluenceSymmetry),
+    None
 )
 
 
@@ -67,12 +67,12 @@ def _try_delete_menu():
         cmds.deleteUI(_POLY_SYMMETRY_MENU_NAME)   
         
 
-def _initializePlugin():
+def _initializePlugin(*args):
     """Construct the poly symmetry plugin menu."""
             
     if cmds.about(batch=True):
         return
-    
+        
     _try_delete_menu()
     
     cmds.menu(
@@ -82,19 +82,26 @@ def _initializePlugin():
     )
 
     for item in _POLY_SYMMETRY_MENU_ITEMS:
-        if item is None:
-            cmds.menuItem(divider=True)
-            continue 
+        _addMenuItem(item)
 
+    _addMenuItem(
+        _MenuItem('Reload Menu', _initializePlugin)
+    )
+        
+    cmds.menuSet("riggingMenuSet", addMenu=_POLY_SYMMETRY_MENU_NAME)
+    
+
+def _addMenuItem(item):
+    if item is None:
+        cmds.menuItem(divider=True)
+    else:
         cmds.menuItem(
             label=item.name,
             command=item, 
             sourceType='python'
         )
-        
-    cmds.menuSet("riggingMenuSet", addMenu=_POLY_SYMMETRY_MENU_NAME)
-    
-    
+
+
 def _uninitializePlugin():
     """Construct the poly symmetry plugin menu."""
 

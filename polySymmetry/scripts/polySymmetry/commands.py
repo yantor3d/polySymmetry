@@ -279,6 +279,72 @@ def mirrorPolySkinWeights(*args):
             )
 
 
+def setInfluenceSymmetry(*args):
+    """Sets the symmetry attributes of the influences for the selected mesh(es).
+    
+    Parameters
+    ----------
+    *args : str
+        List of skinned polygon meshes. If empty, the active selection is used.
+        
+    """
+
+    selectedMeshes = _getSelectedMeshes(*args)
+
+    if not selectedMeshes:
+        _ERR("Select a skinned mesh and try again.")
+        return
+
+    with undoChunk():
+        for mesh in selectedMeshes:
+            skin = _getSkinCluster(mesh)
+
+            if not skin:
+                _WARN("Skipping '%s' since it is not skinned." % mesh)
+                continue
+
+            cmds.polySkinWeights(
+                skin,
+                edit=True,
+                influenceSymmetry=("L_*", "R_*")
+            )
+
+
+def printInfluenceSymmetry(*args):
+    """Sets the symmetry attributes of the influences for the selected mesh(es).
+    
+    Parameters
+    ----------
+    *args : str
+        List of skinned polygon meshes. If empty, the active selection is used.
+        
+    """
+
+    selectedMeshes = _getSelectedMeshes(*args)
+
+    if not selectedMeshes:
+        _ERR("Select a skinned mesh and try again.")
+        return
+
+    with undoChunk():
+        for mesh in selectedMeshes:
+            skin = _getSkinCluster(mesh)
+
+            if not skin:
+                _WARN("Skipping '%s' since it is not skinned." % mesh)
+                continue
+
+            result = cmds.polySkinWeights(
+                skin,
+                query=True,
+                influenceSymmetry=True
+            )
+
+            print('Mesh: {}'.format(mesh))
+            print('Skin: {}'.format(skin))
+            print('\n'.join(['{:>32} : {:>32}'.format(*sym.split(':')) for sym in result]))
+
+
 def _getSkinCluster(mesh):
     """Returns the skinCluster that deforms `mesh`.
     
