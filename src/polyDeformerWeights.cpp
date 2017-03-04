@@ -176,6 +176,19 @@ MStatus PolyDeformerWeightsCommand::validateArguments()
         }
     }
 
+    MSelectionList activeSelection;
+    MSelectionList vertexSelection;
+
+    MGlobal::getActiveSelectionList(activeSelection);
+
+    if (destinationMesh.node().hasFn(MFn::kMesh)) { destinationMesh.pop(); }
+    getSelectedComponents(destinationMesh, activeSelection, vertexSelection, MFn::Type::kMeshVertComponent);
+
+    if (!vertexSelection.isEmpty())
+    {
+        vertexSelection.getDagPath(0, destinationMesh, components);
+    }
+
     if (!sourceMesh.node().hasFn(MFn::kMesh))
     {
         sourceMesh.extendToShapeDirectlyBelow(0);
@@ -270,6 +283,8 @@ MStatus PolyDeformerWeightsCommand::redoIt()
     status = fnDestinationDeformer.getWeights(destinationGeometryIndex, destinationComponents, oldWeightValues);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    destinationWeights.copy(sourceWeights);
+
     if (mirrorWeights || flipWeights)
     {
         vector<int> vertexSymmetry;
@@ -280,20 +295,26 @@ MStatus PolyDeformerWeightsCommand::redoIt()
         PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
         PolySymmetryNode::getValues(fnNode, VERTEX_SIDES, vertexSides);
 
-        for (int i = 0; i < numberOfVertices; i++)
-        {
-            int o = vertexSymmetry[i];
-            float wt = sourceWeights[i];
+        MItGeometry itGeo(destinationMesh, components);
 
-            if (flipWeights || (mirrorWeights && vertexSides[i] != direction))
+        bool useVertexSelection = !components.isNull();
+
+        while (!itGeo.isDone())
+        {
+            int i = itGeo.index();
+            int o = vertexSymmetry[i];
+
+            float wti = this->getWeight(i, sourceWeights, vertexSymmetry, vertexSides);
+            destinationWeights.set(wti, i);  
+
+            if (useVertexSelection)
             {
-                wt = sourceWeights[o];
+                float wto = this->getWeight(o, sourceWeights, vertexSymmetry, vertexSides);
+                destinationWeights.set(wto, o);  
             }
 
-            destinationWeights.set(wt, i);
+            itGeo.next();
         }
-    } else {
-        destinationWeights.copy(sourceWeights);
     }
 
     status = fnDestinationDeformer.setWeight(this->destinationMesh, destinationGeometryIndex, destinationComponents, destinationWeights);
@@ -304,6 +325,21 @@ MStatus PolyDeformerWeightsCommand::redoIt()
 
     return MStatus::kSuccess;    
 }
+
+float PolyDeformerWeightsCommand::getWeight(int vertexIndex, MFloatArray &sourceWeights, vector<int> &vertexSymmetry, vector<int> vertexSides)
+{
+    int i = vertexIndex;
+    int o = vertexSymmetry[i];
+    float wt = sourceWeights[i];
+
+    if (flipWeights || (mirrorWeights && vertexSides[i] != direction))
+    {
+        wt = sourceWeights[o];
+    }
+
+    return wt;
+}
+
 
 MStatus PolyDeformerWeightsCommand::undoIt()
 {

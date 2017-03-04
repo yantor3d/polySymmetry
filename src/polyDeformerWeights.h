@@ -6,6 +6,8 @@
 #ifndef POLY_DEFORMER_WEIGHTS_H
 #define POLY_DEFORMER_WEIGHTS_H
 
+#include <vector>
+
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
 #include <maya/MDagPath.h>
@@ -15,6 +17,8 @@
 #include <maya/MString.h>
 #include <maya/MStatus.h>
 #include <maya/MSyntax.h>
+
+using namespace std;
 
 class PolyDeformerWeightsCommand : public MPxCommand
 {
@@ -31,6 +35,8 @@ public:
     virtual MStatus     doIt(const MArgList& argList);
     virtual MStatus     redoIt();
     virtual MStatus     undoIt();
+
+    virtual float       getWeight(int vertexIndex, MFloatArray &sourceWeights, vector<int> &vertexSymmetry, vector<int> vertexSides);
 
     virtual bool        isUndoable() const { return true; }
     virtual bool        hasSyntax()  const { return true; }
