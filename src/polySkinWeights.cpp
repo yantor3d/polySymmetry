@@ -123,6 +123,7 @@ MSyntax PolySkinWeightsCommand::getSyntax()
     syntax.addFlag(DESTINATION_SKIN_FLAG, DESTINATION_SKIN_LONG_FLAG, MSyntax::kString);
 
     syntax.addFlag(INFLUENCE_SYMMETRY_FLAG, INFLUENCE_SYMMETRY_LONG_FLAG, MSyntax::kString, MSyntax::kString);
+    syntax.makeFlagQueryWithFullArgs(INFLUENCE_SYMMETRY_FLAG, true);
 
     syntax.addFlag(DIRECTION_FLAG, DIRECTION_LONG_FLAG, MSyntax::kLong);
     syntax.addFlag(FLIP_FLAG, FLIP_LONG_FLAG);
@@ -134,6 +135,7 @@ MSyntax PolySkinWeightsCommand::getSyntax()
 
     return syntax;
 }
+
 
 /* Unpack the command arguments */
 MStatus PolySkinWeightsCommand::parseArguments(MArgDatabase &argsData)
@@ -152,6 +154,11 @@ MStatus PolySkinWeightsCommand::parseArguments(MArgDatabase &argsData)
     status = parseArgs::getDagPathArgument(argsData, DESTINATION_MESH_FLAG, this->destinationMesh, false);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    if (argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
+    {
+        this->parseInfluenceSymmetryArgument(argsData);
+    }
+
     this->direction = argsData.isFlagSet(DIRECTION_FLAG) ? argsData.flagArgumentInt(DIRECTION_FLAG, 0, &status) : 1;
 
     this->mirrorWeights = argsData.isFlagSet(MIRROR_FLAG);
@@ -161,6 +168,7 @@ MStatus PolySkinWeightsCommand::parseArguments(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+
 /* Unpack the edit arguments */
 MStatus PolySkinWeightsCommand::parseEditArguments(MArgDatabase &argsData)
 {
@@ -169,16 +177,8 @@ MStatus PolySkinWeightsCommand::parseEditArguments(MArgDatabase &argsData)
     status = this->parseQueryArguments(argsData);
     RETURN_IF_ERROR(status);
 
-    if (argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
+    if (!argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
     {
-        MString leftInfluencePatternArg;
-        MString rightInfluencePatternArg;
-        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 0, leftInfluencePatternArg);
-        argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 1, rightInfluencePatternArg);
-
-        leftInfluencePattern = string(leftInfluencePatternArg.asChar());
-        rightInfluencePattern = string(rightInfluencePatternArg.asChar());
-    } else {
         MString errorMsg("^1s/^2s flag is required in edit mode.");
         errorMsg.format(errorMsg, MString(INFLUENCE_SYMMETRY_LONG_FLAG), MString(INFLUENCE_SYMMETRY_FLAG));
 
@@ -186,8 +186,11 @@ MStatus PolySkinWeightsCommand::parseEditArguments(MArgDatabase &argsData)
         return MStatus::kFailure;
     }
 
+    this->parseInfluenceSymmetryArgument(argsData);
+
     return MStatus::kSuccess;
 }
+
 
 /* Unpack the query arguments */
 MStatus PolySkinWeightsCommand::parseQueryArguments(MArgDatabase &argsData)
@@ -214,6 +217,8 @@ MStatus PolySkinWeightsCommand::parseQueryArguments(MArgDatabase &argsData)
         MGlobal::displayError(errorMsg);
         return MStatus::kFailure;
     }
+
+    this->parseInfluenceSymmetryArgument(argsData);
 
     if (status && parseArgs::isNodeType(dagPath, MFn::kMesh))
     {
@@ -258,10 +263,43 @@ MStatus PolySkinWeightsCommand::parseQueryArguments(MArgDatabase &argsData)
     return MStatus::kSuccess;
 }
 
+MStatus PolySkinWeightsCommand::parseInfluenceSymmetryArgument(MArgDatabase &argsData)
+{
+    MStatus status;
+
+    if (argsData.isFlagSet(INFLUENCE_SYMMETRY_FLAG))
+    {
+        MString leftInfluencePatternArg;
+        MString rightInfluencePatternArg;
+
+        MStatus s0 = argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 0, leftInfluencePatternArg);
+        MStatus s1 = argsData.getFlagArgument(INFLUENCE_SYMMETRY_FLAG, 1, rightInfluencePatternArg);
+
+        if (s0 && s1)
+        {
+            leftInfluencePattern = string(leftInfluencePatternArg.asChar());
+            rightInfluencePattern = string(rightInfluencePatternArg.asChar());
+
+            isInfluenceSymmetryFlagSet = true;
+        } else {
+            isQueryInfluenceSymmetry = this->isQuery;
+        }        
+    }
+
+    return MStatus::kSuccess;
+}
+
+
 /* Validate the command arguments */
 MStatus PolySkinWeightsCommand::validateArguments()
 {
     MStatus status;
+
+    if (this->isInfluenceSymmetryFlagSet)
+    {
+        status = this->validateInfluenceSymmetryArgument();
+        RETURN_IF_ERROR(status);
+    }
 
     // Direction msut be left to right (1) or right to left (-1)
     if (this->direction != 1 && this->direction != -1)
@@ -437,6 +475,7 @@ MStatus PolySkinWeightsCommand::validateArguments()
     return MStatus::kSuccess;
 }
 
+
 /* Validate the query arguments. */
 MStatus PolySkinWeightsCommand::validateEditArguments()
 {
@@ -448,29 +487,12 @@ MStatus PolySkinWeightsCommand::validateEditArguments()
         return MStatus::kFailure;
     }
 
-    bool leftPatternIsValid = pystring::index(leftInfluencePattern, string("*")) != -1;
-    bool rightPatternIsValid = pystring::index(rightInfluencePattern, string("*")) != -1;
-
-    if (!leftPatternIsValid || !rightPatternIsValid)
-    {
-        MString errorMsg(
-            "`polySkinWeights -edit ^1s \"^2s\" \"^3s\"` - "
-            "patterns must have at least one '*' wildcard."
-        );
-
-        errorMsg.format(
-            errorMsg,
-            MString(INFLUENCE_SYMMETRY_LONG_FLAG), 
-            MString(leftInfluencePattern.c_str()),
-            MString(rightInfluencePattern.c_str())
-        );
-
-        MGlobal::displayError(errorMsg);
-        return MStatus::kFailure;
-    }
+    status = this->validateInfluenceSymmetryArgument();
+    RETURN_IF_ERROR(status);
 
     return MStatus::kSuccess;
 }
+
 
 /* Validate the query arguments. */
 MStatus PolySkinWeightsCommand::validateQueryArguments()
@@ -483,8 +505,57 @@ MStatus PolySkinWeightsCommand::validateQueryArguments()
         return MStatus::kFailure;
     }
 
+    if (isInfluenceSymmetryFlagSet)
+    {
+        status = validateInfluenceSymmetryArgument();
+        RETURN_IF_ERROR(status);
+    }
+
     return MStatus::kSuccess;
 }
+
+
+MStatus PolySkinWeightsCommand::validateInfluenceSymmetryArgument()
+{
+    MStatus status;
+
+    if (isInfluenceSymmetryFlagSet)
+    {
+        if (leftInfluencePattern.empty() || rightInfluencePattern.empty())
+        {
+            MString errorMsg("^1s/^2s patterns must not be empty strings.");
+
+            errorMsg.format(
+                errorMsg,
+                MString(INFLUENCE_SYMMETRY_LONG_FLAG), 
+                MString(INFLUENCE_SYMMETRY_FLAG)
+            );
+
+            MGlobal::displayError(errorMsg);
+            return MStatus::kFailure;  
+        }
+
+        bool leftPatternIsValid = pystring::index(leftInfluencePattern, string("*")) != -1;
+        bool rightPatternIsValid = pystring::index(rightInfluencePattern, string("*")) != -1;
+
+        if (!leftPatternIsValid || !rightPatternIsValid)
+        {
+            MString errorMsg("^1s/^2s patterns must have at least one '*' wildcard.");
+
+            errorMsg.format(
+                errorMsg,
+                MString(INFLUENCE_SYMMETRY_LONG_FLAG), 
+                MString(INFLUENCE_SYMMETRY_FLAG)
+            );
+
+            MGlobal::displayError(errorMsg);
+            return MStatus::kFailure;
+        }
+    }
+
+    return MStatus::kSuccess;
+}
+
 
 bool PolySkinWeightsCommand::isDeformedBy(MObject &skin, MDagPath &mesh)
 {
@@ -552,6 +623,7 @@ MStatus PolySkinWeightsCommand::redoIt()
     }
 }
 
+
 /* Do the query command */
 MStatus PolySkinWeightsCommand::queryPolySkinWeights()
 {
@@ -564,7 +636,11 @@ MStatus PolySkinWeightsCommand::queryPolySkinWeights()
     uint numberOfInfluences = fnSkin.influenceObjects(influences);
    
     this->getInfluenceKeys(fnSkin, influenceKeys);
-    this->makeInfluenceSymmetryTable(influences, influenceKeys);
+
+    unordered_map<string, JointLabel> jointLabels;
+    getJointLabels(influences, influenceKeys, jointLabels);
+
+    this->makeInfluenceSymmetryTable(influences, influenceKeys, jointLabels);
 
     MStringArray results;
 
@@ -593,6 +669,7 @@ MStatus PolySkinWeightsCommand::queryPolySkinWeights()
     return MStatus::kSuccess;  
 }
 
+
 /* Do the edit command */
 MStatus PolySkinWeightsCommand::editPolySkinWeights()
 {
@@ -605,25 +682,11 @@ MStatus PolySkinWeightsCommand::editPolySkinWeights()
     uint numberOfInfluences = fnSkin.influenceObjects(influences);
     getInfluenceKeys(fnSkin, influenceKeys);
    
-    string wildcard = string("*");
-    string regexAny = string(".*");
-    string emptyString = string("");
+    unordered_map<string, JointLabel> jointLabels;
+    unordered_map<string, JointLabel> newJointLabels;
 
-    string leftToken = pystring::replace(leftInfluencePattern, regexAny, emptyString);
-    string rightToken = pystring::replace(rightInfluencePattern, regexAny, emptyString);
-
-    leftToken = pystring::replace(leftToken, wildcard, emptyString);
-    rightToken = pystring::replace(rightToken, wildcard, emptyString);
-
-    string leftRegexPattern = pystring::replace(leftInfluencePattern, regexAny, wildcard);
-    string rightRegexPattern = pystring::replace(rightInfluencePattern, regexAny, wildcard);
-
-    leftRegexPattern = pystring::replace(leftRegexPattern, wildcard, regexAny);
-    rightRegexPattern = pystring::replace(rightRegexPattern, wildcard, regexAny);
-
-    regex leftRegex(leftRegexPattern);
-    regex rightRegex(rightRegexPattern);
-
+    getJointLabels(influences, influenceKeys, jointLabels);
+    
     for (uint i = 0; i < numberOfInfluences; i++)
     {
         MString influencePathName = influences[i].partialPathName();
@@ -638,47 +701,20 @@ MStatus PolySkinWeightsCommand::editPolySkinWeights()
             continue;
         }
 
-        JointLabel newJointLabel;
+        string key = influenceKeys[i];
 
-        bool isLeft = regex_match(influenceName, leftRegex);
-        bool isRight = regex_match(influenceName, rightRegex);
+        JointLabel oldJointLabel = getJointLabel(influences[i]);
+        JointLabel newJointLabel = jointLabels[key];
 
-        if (isLeft) 
-        {
-            influenceName = pystring::replace(influenceName, leftToken, emptyString);
-            newJointLabel.side = LEFT_SIDE;
-        } else if (isRight) {
-            influenceName = pystring::replace(influenceName, rightToken, emptyString);
-            newJointLabel.side = RIGHT_SIDE;            
-        } else {
-            newJointLabel.side = CENTER_SIDE;
-        }
-
-        newJointLabel.type = OTHER_TYPE;
-        newJointLabel.otherType = MString(influenceName.c_str());
-
-        influenceLabels.emplace(influenceKeys[i], getJointLabel(influences[i]));        
+        oldJointLabels.emplace(key, oldJointLabel);    
+        newJointLabels.emplace(key, newJointLabel);
+            
         setJointLabel(influences[i], newJointLabel);
-    }
-
-    this->makeInfluenceSymmetryTable(influences, influenceKeys);
-    bool symmetryIsSet = this->checkInfluenceSymmetryTable();
-
-    if (!symmetryIsSet)
-    {
-        MString warning("Influences for '^1s' were not configured. Check your arguments for the ^2s/^3s flag and try again..");
-        warning.format(
-            warning, 
-            fnSkin.name(), 
-            MString(INFLUENCE_SYMMETRY_LONG_FLAG),
-            MString(INFLUENCE_SYMMETRY_FLAG)
-        );
-
-        MGlobal::displayWarning(warning);
     }
 
     return MStatus::kSuccess;  
 }
+
 
 /* Do the command */
 MStatus PolySkinWeightsCommand::copyPolySkinWeights()
@@ -713,32 +749,16 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     this->getInfluenceKeys(fnDestinationSkin, destinationInfluenceKeys);
     getAllComponents(destinationMesh, destinationComponents);
 
-    this->makeInfluenceSymmetryTable(destinationInfluences, destinationInfluenceKeys);
+    unordered_map<string, JointLabel> jointLabels;
+    getJointLabels(destinationInfluences, destinationInfluenceKeys, jointLabels);
 
-    bool symmetryIsSet = this->checkInfluenceSymmetryTable();
-
-    if (!symmetryIsSet)
-    {
-        MString verboseWarning(
-            "All joint influence's have the the same side/type/otherType attribute values. "
-            "Run 'polySymmetry -edit -^1s \"[LEFT PATTERN]\" \"[RIGHT PATTERN]\"' to auto-configure the influences."
-        );
-
-        MString warning("Influences for '^1s' are not configured. See script editor for details.");
-
-        verboseWarning.format(verboseWarning, MString(INFLUENCE_SYMMETRY_LONG_FLAG));
-        warning.format(warning, fnDestinationSkin.name());
-
-        MGlobal::displayWarning(verboseWarning);
-        MGlobal::displayWarning(warning);
-    }
-    
+    this->makeInfluenceSymmetryTable(destinationInfluences, destinationInfluenceKeys, jointLabels);    
     this->makeWeightTables(destinationInfluenceKeys);
 
     status = fnSourceSkin.getWeights(
         sourceMesh, 
         sourceComponents, 
-        sourceInfluenceIndices, 
+        sourceInfluenceIndices,
         sourceWeights
     );
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -862,20 +882,17 @@ MStatus PolySkinWeightsCommand::makeInfluencesMatch(MFnSkinCluster &fnSourceSkin
 
 
 /* Constructs an influence->influence symmetry map. */
-MStatus PolySkinWeightsCommand::makeInfluenceSymmetryTable(MDagPathArray &influences, vector<string> &influenceKeys)
-{
+MStatus PolySkinWeightsCommand::makeInfluenceSymmetryTable(
+    MDagPathArray &influences, 
+    vector<string> &influenceKeys,
+    unordered_map<string, JointLabel> &jointLabels
+) {
     MStatus status;
 
     uint numberOfInfluences = influences.length();
 
-    unordered_map<string, JointLabel> jointLabels;
-   
-    for (uint i = 0; i < numberOfInfluences; i++)
+    for (string key : influenceKeys)
     {
-        JointLabel lbl = this->getJointLabel(influences[i]);
-        string key = influenceKeys[i];
-        jointLabels.emplace(key, lbl);
-
         this->influenceSymmetry.emplace(key, key);
     }
 
@@ -921,23 +938,6 @@ MStatus PolySkinWeightsCommand::makeInfluenceSymmetryTable(MDagPathArray &influe
 
     return MStatus::kSuccess;
 }
-
-/* Confirm that at least one pair of influences are symmetrical to each other. */
-bool PolySkinWeightsCommand::checkInfluenceSymmetryTable()
-{
-    bool result = false;
-
-    for (auto it = this->influenceSymmetry.begin(); it != this->influenceSymmetry.end(); ++it)
-    {
-        if (it->first != it->second)
-        {
-            result = true;
-        }
-    }
-
-    return result;
-}
-
 
 
 /* Constructs a pair of maps (influence->weights) from the influences of the desination skin cluster. */
@@ -1049,6 +1049,7 @@ void PolySkinWeightsCommand::copyWeightsTable(vector<string> &influenceKeys)
     }
 }
 
+
 /* Copy the weights from the old weights table indices to the opposite indices in the new weights table. */
 void PolySkinWeightsCommand::flipWeightsTable(vector<string> &influenceKeys)
 {
@@ -1068,6 +1069,7 @@ void PolySkinWeightsCommand::flipWeightsTable(vector<string> &influenceKeys)
         }
     }
 }
+
 
 /* Copy the weights from the old weights table indices to the same and opposite indices in the new weights table. */
 void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
@@ -1164,6 +1166,71 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
     }
 }
 
+
+/* Populates the jointLabels map. */
+void PolySkinWeightsCommand::getJointLabels(MDagPathArray &influences, vector<string> &influenceKeys, unordered_map<string, JointLabel> &jointLabels)
+{
+    uint numberOfInfluences = influences.length();
+
+    if (this->isInfluenceSymmetryFlagSet)
+    {
+        string wildcard = string("*");
+        string regexAny = string(".*");
+        string emptyString = string("");
+
+        string leftToken = pystring::replace(leftInfluencePattern, regexAny, emptyString);
+        string rightToken = pystring::replace(rightInfluencePattern, regexAny, emptyString);
+
+        leftToken = pystring::replace(leftToken, wildcard, emptyString);
+        rightToken = pystring::replace(rightToken, wildcard, emptyString);
+
+        string leftRegexPattern = pystring::replace(leftInfluencePattern, regexAny, wildcard);
+        string rightRegexPattern = pystring::replace(rightInfluencePattern, regexAny, wildcard);
+
+        leftRegexPattern = pystring::replace(leftRegexPattern, wildcard, regexAny);
+        rightRegexPattern = pystring::replace(rightRegexPattern, wildcard, regexAny);
+
+        regex leftRegex(leftRegexPattern);
+        regex rightRegex(rightRegexPattern);
+
+        for (uint i = 0; i < numberOfInfluences; i++)
+        {
+            MString influencePathName = influences[i].partialPathName();
+            string influenceName(influencePathName.asChar());
+
+            JointLabel newJointLabel;
+
+            bool isLeft = regex_match(influenceName, leftRegex);
+            bool isRight = regex_match(influenceName, rightRegex);
+
+            if (isLeft) 
+            {
+                influenceName = pystring::replace(influenceName, leftToken, emptyString);
+                newJointLabel.side = LEFT_SIDE;
+            } else if (isRight) {
+                influenceName = pystring::replace(influenceName, rightToken, emptyString);
+                newJointLabel.side = RIGHT_SIDE;            
+            } else {
+                newJointLabel.side = CENTER_SIDE;
+            }
+
+            newJointLabel.type = OTHER_TYPE;
+            newJointLabel.otherType = MString(influenceName.c_str());
+
+            jointLabels.emplace(influenceKeys[i], newJointLabel);
+        }
+    } else {
+        for (uint i = 0; i < numberOfInfluences; i++)
+        {
+            string key = influenceKeys[i];
+            JointLabel lbl = this->getJointLabel(influences[i]);
+
+            jointLabels.emplace(key, lbl);
+        }
+    }
+}
+
+
 /* Return the side, type, and otherType values for the given influence. */
 JointLabel PolySkinWeightsCommand::getJointLabel(MDagPath &influence)
 {
@@ -1188,6 +1255,8 @@ JointLabel PolySkinWeightsCommand::getJointLabel(MDagPath &influence)
     return result;
 }
 
+
+/* Set the side, type, and otherType attributes to the values in `jointLabel`. */
 MStatus PolySkinWeightsCommand::setJointLabel(MDagPath &influence, JointLabel &jointLabel)
 {
     MStatus status;
@@ -1235,6 +1304,8 @@ MStatus PolySkinWeightsCommand::undoIt()
     }
 }
 
+
+/* Revert changes to the skinCluster influences, weightList. */
 MStatus PolySkinWeightsCommand::undoCopyPolySkinWeights()
 {
     MStatus status;
@@ -1261,6 +1332,8 @@ MStatus PolySkinWeightsCommand::undoCopyPolySkinWeights()
     return MStatus::kSuccess;
 }
 
+
+/* Revert changes to the side/type/otherType attributes on the skinCluster influences. */
 MStatus PolySkinWeightsCommand::undoEditPolySkinWeights()
 {
     MStatus status;
@@ -1275,16 +1348,17 @@ MStatus PolySkinWeightsCommand::undoEditPolySkinWeights()
 
     for (uint i = 0; i < numberOfInfluences; i++)
     {
-        auto got = influenceLabels.find(influenceKeys[i]);
+        auto got = oldJointLabels.find(influenceKeys[i]);
 
-        if (got != influenceLabels.end())
+        if (got != oldJointLabels.end())
         {
-            setJointLabel(influences[i], influenceLabels[influenceKeys[i]]);
+            setJointLabel(influences[i], oldJointLabels[influenceKeys[i]]);
         }
     }
 
     return MStatus::kSuccess;
 }
+
 
 bool PolySkinWeightsCommand::isUndoable()  const 
 { 

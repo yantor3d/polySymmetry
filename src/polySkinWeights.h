@@ -48,10 +48,12 @@ public:
     virtual MStatus     parseArguments(MArgDatabase &argsData);
     virtual MStatus     parseEditArguments(MArgDatabase &argsData);
     virtual MStatus     parseQueryArguments(MArgDatabase &argsData);
+    virtual MStatus     parseInfluenceSymmetryArgument(MArgDatabase &argsData);
 
     virtual MStatus     validateArguments();
     virtual MStatus     validateEditArguments();
     virtual MStatus     validateQueryArguments();
+    virtual MStatus     validateInfluenceSymmetryArgument();
 
     virtual bool        isDeformedBy(MObject &skin, MDagPath &mesh);
 
@@ -71,8 +73,7 @@ public:
     virtual void        mirrorWeightsTable(vector<string> &influenceKeys);
 
     virtual MStatus     makeInfluencesMatch(MFnSkinCluster &fnSourceSkin, MFnSkinCluster &fnDestinationSkin);
-    virtual MStatus     makeInfluenceSymmetryTable(MDagPathArray &influences, vector<string> &influenceKeys);
-    virtual bool        checkInfluenceSymmetryTable();
+    virtual MStatus     makeInfluenceSymmetryTable(MDagPathArray &influences, vector<string> &influenceKeys, unordered_map<string, JointLabel> &jointLabels);
     
     virtual void        makeWeightTables(vector<string> &influenceKeys);
     virtual void        setWeightsTable(unordered_map<string, vector<double>> &weightTable, MDoubleArray &weights, vector<string> &influenceKeys);
@@ -81,6 +82,7 @@ public:
     virtual MStatus     getInfluenceIndices(MFnSkinCluster &fnSkin, MIntArray &influenceIndices);
     virtual MStatus     getInfluenceKeys(MFnSkinCluster &fnSkin, vector<string> &influenceKeys);
 
+    virtual void        getJointLabels(MDagPathArray &influences, vector<string> &influenceKeys, unordered_map<string, JointLabel> &jointLabels);
     virtual JointLabel  getJointLabel(MDagPath &influence);
     virtual MStatus     setJointLabel(MDagPath &influence, JointLabel &jointLabel);
 
@@ -100,13 +102,16 @@ private:
     bool                isQuery = false;
     bool                isEdit = false;
 
+    bool                isInfluenceSymmetryFlagSet = false;
+    bool                isQueryInfluenceSymmetry = false;
+
     uint                numberOfVertices;
 
     string              leftInfluencePattern;
     string              rightInfluencePattern;
     
     unordered_map<string, string>         influenceSymmetry;
-    unordered_map<string, JointLabel>     influenceLabels;
+    unordered_map<string, JointLabel>     oldJointLabels;
     unordered_map<string, vector<double>> oldWeights;
     unordered_map<string, vector<double>> newWeights;
 
