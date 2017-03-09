@@ -1127,6 +1127,11 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
 
             double wt = newWeights[ii][i];
 
+            if (fabs(wt) < 1e-5)
+            {
+                continue;
+            }
+
             if (ii == oi)
             {
                 centerWeights += wt;
