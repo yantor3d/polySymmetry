@@ -11,6 +11,8 @@
 
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
+#include <maya/MFnMesh.h>
+#include <maya/MFnSingleIndexedComponent.h>
 #include <maya/MItGeometry.h>
 #include <maya/MItMeshEdge.h>
 #include <maya/MItMeshPolygon.h>
@@ -191,16 +193,9 @@ bool getSymmetricalComponentSelection(MeshData &meshData, MSelectionList &select
     return result;
 }
 
-void getAllComponents(MDagPath &mesh, MObject &components)
+void getAllVertices(int &numberOfVertices, MObject &components)
 {
-    MSelectionList selection;
-    MItGeometry itGeo(mesh);
-
-    while (!itGeo.isDone())
-    {
-        selection.add(mesh, itGeo.currentItem(), true);
-        itGeo.next();
-    }
-
-    selection.getDagPath(0, mesh, components);
+    MFnSingleIndexedComponent vertices;
+    components = vertices.create(MFn::kMeshVertComponent);
+    vertices.setCompleteData(numberOfVertices);
 }
