@@ -1,9 +1,10 @@
-from contextlib import contextmanager
+import contextlib
 
-from maya.api import OpenMaya
+import maya.api.OpenMaya as OpenMaya
+import maya.cmds as cmds
+import maya.mel as mel
 
-from maya import cmds
-from maya import mel
+import polySymmetry.utils 
 
 
 _INFO = OpenMaya.MGlobal.displayInfo
@@ -115,11 +116,11 @@ def polyDeformerWeights(*args, **kwargs):
     selectedDeformers = _getSelectedDeformers(*args)
 
     if not selectedMeshes or not selectedDeformers:
-        _ERR("Must select at least one mesh and one deformer.")
+        raise polySymmetry.utils.InvalidSelection("Must select at least one mesh and one deformer.")
         return
 
     if len(selectedMeshes) != len(selectedDeformers):
-        _ERR("Must select exactly one deformer per mesh.")
+        raise polySymmetry.utils.InvalidSelection("Must select exactly one deformer per mesh.")
         return
 
     logMsg = "Result: {} weights on {} ({})."
@@ -156,7 +157,7 @@ def flipMesh(*args):
     selectedMeshes = _getSelectedMeshes(*args)
 
     if not selectedMeshes:
-        _ERR("Select a mesh and try again.")
+        raise polySymmetry.utils.InvalidSelection("Select a mesh and try again.")
         return
 
     with undoChunk():
@@ -184,7 +185,7 @@ def mirrorMesh(*args):
     selectedMeshes = _getSelectedMeshes(*args)
 
     if len(selectedMeshes) < 2:
-        _ERR("Select a base mesh and a target mesh and try again.")
+        raise polySymmetry.utils.InvalidSelection("Select a base mesh and a target mesh and try again.")
         return
 
     baseMesh = selectedMeshes[0]
@@ -212,18 +213,18 @@ def copyPolySkinWeights(*args):
     try:
         sourceMesh, destinationMesh = _getSelectedMeshes(*args)
     except ValueError:
-        _ERR("Must select a souce mesh and a destination mesh.")
+        raise polySymmetry.utils.InvalidSelection("Must select a souce mesh and a destination mesh.")
         return
 
     sourceSkin = _getSkinCluster(sourceMesh)
     destinationSkin = _getSkinCluster(destinationMesh)
 
     if not sourceSkin:
-        _ERR("'%s' is not skinned." % sourceMesh)
+        raise polySymmetry.utils.InvalidSelection("'%s' is not skinned." % sourceMesh)
         return
 
     if not destinationSkin:
-        _ERR("'%s' is not skinned." % destinationMesh)
+        raise polySymmetry.utils.InvalidSelection("'%s' is not skinned." % destinationMesh)
         return
 
     cmds.polySkinWeights(
@@ -236,7 +237,7 @@ def copyPolySkinWeights(*args):
     )
 
 
-def mirrorPolySkinWeights(*args):
+def mirrorPolySkinWeights(*args, **kwargs):
     """Mirrors the skinCluster weights on the selected mesh(es).
     
     Parameters
@@ -258,8 +259,7 @@ def mirrorPolySkinWeights(*args):
     skinClusters = [_getSkinCluster(mesh) for mesh in selectedMeshes]
 
     if not selectedMeshes:
-        _ERR("Select a skinned mesh and try again.")
-        return
+        raise polySymmetry.utils.InvalidSelection("Select a skinned mesh and try again.")
 
     with undoChunk():
         for mesh, skin in zip(selectedMeshes, skinClusters):
@@ -273,27 +273,30 @@ def mirrorPolySkinWeights(*args):
                 sourceSkin=skin,
                 destinationMesh=mesh,
                 destinationSkin=skin,
-                direction=1,
-                mirror=True,
-                normalize=True
+                **kwargs
             )
 
 
-def setInfluenceSymmetry(*args):
+def setInfluenceSymmetry(*args, **kwargs):
     """Sets the symmetry attributes of the influences for the selected mesh(es).
     
     Parameters
     ----------
     *args : str
         List of skinned polygon meshes. If empty, the active selection is used.
-        
+    **leftPattern : str
+        Pattern for matching influences on the left side of the mesh. 
+    **rightPattern : str 
+        Pattern for matching influences on the right side of the mesh.         
     """
 
     selectedMeshes = _getSelectedMeshes(*args)
 
+    leftPattern = kwargs.get('leftPattern', 'L_*')
+    rightPattern = kwargs.get('leftPattern', 'R_*')
+
     if not selectedMeshes:
-        _ERR("Select a skinned mesh and try again.")
-        return
+        raise polySymmetry.utils.InvalidSelection("Select a skinned mesh and try again.")
 
     with undoChunk():
         for mesh in selectedMeshes:
@@ -306,7 +309,7 @@ def setInfluenceSymmetry(*args):
             cmds.polySkinWeights(
                 skin,
                 edit=True,
-                influenceSymmetry=("L_*", "R_*")
+                influenceSymmetry=(leftPattern, rightPattern)
             )
 
 
@@ -323,8 +326,7 @@ def printInfluenceSymmetry(*args):
     selectedMeshes = _getSelectedMeshes(*args)
 
     if not selectedMeshes:
-        _ERR("Select a skinned mesh and try again.")
-        return
+        raise polySymmetry.utils.InvalidSelection("Select a skinned mesh and try again.")
 
     with undoChunk():
         for mesh in selectedMeshes:
@@ -385,7 +387,7 @@ def _getSelection(*args):
             try:
                 selection.add(arg)
             except RuntimeError:
-                raise RuntimeError("No object matches name '%s'" % arg)
+                raise NameError("No object matches name '%s'" % arg)
     else:
         selection = OpenMaya.MGlobal.getActiveSelectionList()
 
@@ -473,7 +475,7 @@ def _getSelectedMeshes(*args):
     return result     
 
 
-@contextmanager
+@contextlib.contextmanager
 def undoChunk():
     """Wraps a block of code in an undo chunk."""
 
