@@ -602,7 +602,6 @@ MStatus PolySkinWeightsCommand::doIt(const MArgList& argList)
     } else {
         status = this->parseArguments(argsData);
         RETURN_IF_ERROR(status);
-
         status = this->validateArguments();
         RETURN_IF_ERROR(status);
     }
@@ -701,13 +700,11 @@ MStatus PolySkinWeightsCommand::editPolySkinWeights()
             continue;
         }
 
-        string key = influenceKeys[i];
-
         JointLabel oldJointLabel = getJointLabel(influences[i]);
-        JointLabel newJointLabel = jointLabels[key];
+        JointLabel newJointLabel = jointLabels[influenceKeys[i]];
 
-        oldJointLabels.emplace(key, oldJointLabel);    
-        newJointLabels.emplace(key, newJointLabel);
+        oldJointLabels.emplace(influenceKeys[i], oldJointLabel);    
+        newJointLabels.emplace(influenceKeys[i], newJointLabel);
             
         setJointLabel(influences[i], newJointLabel);
     }
@@ -724,8 +721,13 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     MFnSkinCluster fnSourceSkin(this->sourceSkin);
     MFnSkinCluster fnDestinationSkin(this->destinationSkin);
 
-    status = this->makeInfluencesMatch(fnSourceSkin, fnDestinationSkin);
-    RETURN_IF_ERROR(status);
+    bool destinationIsSource = this->sourceSkin == this->destinationSkin;
+
+    if (!destinationIsSource)
+    {
+        status = this->makeInfluencesMatch(fnSourceSkin, fnDestinationSkin);
+        RETURN_IF_ERROR(status);
+    }
 
     MDagPathArray   sourceInfluences;
     MIntArray       sourceInfluenceIndices;
@@ -742,18 +744,25 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     numSourceInfluences = fnSourceSkin.influenceObjects(sourceInfluences);
     this->getInfluenceIndices(fnSourceSkin, sourceInfluenceIndices);
     this->getInfluenceKeys(fnSourceSkin, sourceInfluenceKeys);
-    getAllComponents(sourceMesh, sourceComponents);
+
+    int nv = (int) this->numberOfVertices;
+    getAllVertices(nv, sourceComponents);
 
     numDestinationInfluences = fnDestinationSkin.influenceObjects(destinationInfluences);
     this->getInfluenceIndices(fnDestinationSkin, destinationInfluenceIndices);
     this->getInfluenceKeys(fnDestinationSkin, destinationInfluenceKeys);
-    getAllComponents(destinationMesh, destinationComponents);
+    getAllVertices(nv, destinationComponents);
 
     unordered_map<string, JointLabel> jointLabels;
     getJointLabels(destinationInfluences, destinationInfluenceKeys, jointLabels);
 
     this->makeInfluenceSymmetryTable(destinationInfluences, destinationInfluenceKeys, jointLabels);    
-    this->makeWeightTables(destinationInfluenceKeys);
+    this->setupWeightTables(sourceInfluenceKeys);
+
+    if (!destinationIsSource)
+    {
+        this->setupWeightTables(destinationInfluenceKeys);
+    }
 
     status = fnSourceSkin.getWeights(
         sourceMesh, 
@@ -763,13 +772,18 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
     );
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = fnDestinationSkin.getWeights(
-        destinationMesh, 
-        destinationComponents, 
-        destinationInfluenceIndices, 
-        destinationWeights
-    );
-    CHECK_MSTATUS_AND_RETURN_IT(status);
+    if (destinationIsSource)
+    {
+        destinationWeights.copy(sourceWeights);
+    } else {
+        status = fnDestinationSkin.getWeights(
+            destinationMesh, 
+            destinationComponents, 
+            destinationInfluenceIndices, 
+            destinationWeights
+        );
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
 
     this->setWeightsTable(this->oldWeights, sourceWeights, sourceInfluenceKeys);
 
@@ -941,15 +955,19 @@ MStatus PolySkinWeightsCommand::makeInfluenceSymmetryTable(
 
 
 /* Constructs a pair of maps (influence->weights) from the influences of the desination skin cluster. */
-void PolySkinWeightsCommand::makeWeightTables(vector<string> &influenceKeys) 
+void PolySkinWeightsCommand::setupWeightTables(vector<string> &influenceKeys) 
 {
-    uint numberOfInfluences = (uint) influenceKeys.size();
-
-    for (uint i = 0; i < numberOfInfluences; i++)
+    for (string ii : influenceKeys)
     {
-        string key = influenceKeys[i];
-        oldWeights.emplace(key, vector<double>(this->numberOfVertices));
-        newWeights.emplace(key, vector<double>(this->numberOfVertices));
+        if (oldWeights.find(ii) == oldWeights.end())
+        {
+            oldWeights.emplace(ii, vector<double>(this->numberOfVertices));
+        }
+
+        if (newWeights.find(ii) == newWeights.end())
+        {
+            newWeights.emplace(ii, vector<double>(this->numberOfVertices));
+        }
     }
 }
 
@@ -976,16 +994,12 @@ void PolySkinWeightsCommand::getWeightsTable(unordered_map<string, vector<double
 
     weights.setLength(this->numberOfVertices * numberOfInfluences);
 
-    for (int i : selectedVertexIndices)
+    for (uint j = 0; j < numberOfInfluences; j++)
     {
-        for (uint j = 0; j < numberOfInfluences; j++)
-        {
-            string key = influenceKeys[j];
-            uint wi = (i * numberOfInfluences) + j;
-            
-            bool hasKey = weightTable.find(key) != weightTable.end();
-
-            double wt = hasKey ? weightTable[key][i] : 0.0;
+        for (int i : selectedVertexIndices)
+        {            
+            uint wi = (i * numberOfInfluences) + j;            
+            double wt = weightTable[influenceKeys[j]][i];
 
             weights.set(wt, wi);
         }
@@ -1030,8 +1044,7 @@ MStatus PolySkinWeightsCommand::getInfluenceKeys(MFnSkinCluster &fnSkin, vector<
 
     for (uint i = 0; i < numberOfInfluences; i++)
     {
-        string key = string(influences[i].fullPathName().asChar());
-        influenceKeys[i] = key;
+        influenceKeys[i] = string(influences[i].fullPathName().asChar());
     }
 
     return MStatus::kSuccess;
@@ -1059,13 +1072,15 @@ void PolySkinWeightsCommand::flipWeightsTable(vector<string> &influenceKeys)
     PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
 
     for (string ii : influenceKeys)
-    {
+    {        
+        string oi = influenceSymmetry[ii];
+
         for (int i : selectedVertexIndices)
         {
             int o = vertexSymmetry[i];
 
-            newWeights[ii][i] = oldWeights[ii][o];
-            newWeights[ii][o] = oldWeights[ii][i];
+            newWeights[ii][i] = oldWeights[oi][o];
+            newWeights[ii][o] = oldWeights[oi][i];
         }
     }
 }
@@ -1080,93 +1095,19 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
     MFnDependencyNode fnNode(this->polySymmetryData);
     PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
     PolySymmetryNode::getValues(fnNode, VERTEX_SIDES, vertexSides);
-    
+
     for (string ii : influenceKeys)
     {
-        if (newWeights.find(ii) == newWeights.end())
-        {
-            continue;
-        }
+        string oi = influenceSymmetry[ii];
 
         for (int i : selectedVertexIndices)
-        {
+        {                
             int o = vertexSymmetry[i];
-            string oi = influenceSymmetry[ii];
 
-            if (vertexSides[i] == CENTER_SIDE)
-            {
-                if (oldWeights.find(oi) != oldWeights.end() && ii != oi)
-                {
-                    newWeights[ii][i] = oldWeights[ii][i];
-                    newWeights[oi][i] = oldWeights[ii][i];
-                } else {
-                    newWeights[ii][i] = oldWeights[ii][i];
-                }
-            } else if (vertexSides[i] == direction) {
-                newWeights[ii][i] = oldWeights[ii][i];
-            } else {
-                if (oldWeights.find(oi) != oldWeights.end()) 
-                {
-                    newWeights[ii][i] = oldWeights[oi][o];
-                } else {
-                    newWeights[ii][i] = 0.0;
-                }
-            }
-        }
-    }
-
-    for (int i : selectedVertexIndices)
-    {
-        double centerWeightMax = 0.0;
-        double centerWeights = 0.0;
-        double sideWeights = 0.0;
-
-        for (string ii : influenceKeys)
-        {
-            string oi = influenceSymmetry[ii];
-
-            double wt = newWeights[ii][i];
-
-            if (fabs(wt) < 1e-5)
-            {
-                continue;
-            }
-
-            if (ii == oi)
-            {
-                centerWeights += wt;
-                centerWeightMax = max(centerWeightMax, wt);
-            } else {
-                sideWeights += wt;
-            }
-        }
-
-        double sumOfWeights = centerWeights + sideWeights;
-
-        if (sumOfWeights > 1.0 && centerWeights > 1e-5)
-        {
-            double sideMult = (1.0 - centerWeights) * sumOfWeights;    
-            double centerMult = max(0.0, 1.0 - (sideWeights * sideMult)) * (1.0 / centerWeightMax);
-
-            for (string ii : influenceKeys)
-            {
-                string oi = influenceSymmetry[ii];
-
-                if (ii != oi)
-                {
-                    newWeights[ii][i] *= sideMult;
-                }
-            }            
-
-            for (string ii : influenceKeys)
-            {
-                string oi = influenceSymmetry[ii];
-
-                if (ii == oi)
-                {
-                    newWeights[ii][i] *= centerMult;
-                }
-            }
+            int leftVertexMask = (vertexSides[i] == CENTER_SIDE) | (vertexSides[i] == direction);
+            int rightVertexMask = 1 - leftVertexMask;
+       
+            newWeights[ii][i] = (leftVertexMask * oldWeights[ii][i]) + (rightVertexMask * oldWeights[oi][o]);
         }
     }
 }
@@ -1227,10 +1168,9 @@ void PolySkinWeightsCommand::getJointLabels(MDagPathArray &influences, vector<st
     } else {
         for (uint i = 0; i < numberOfInfluences; i++)
         {
-            string key = influenceKeys[i];
             JointLabel lbl = this->getJointLabel(influences[i]);
 
-            jointLabels.emplace(key, lbl);
+            jointLabels.emplace(influenceKeys[i], lbl);
         }
     }
 }
@@ -1239,7 +1179,6 @@ void PolySkinWeightsCommand::getJointLabels(MDagPathArray &influences, vector<st
 /* Return the side, type, and otherType values for the given influence. */
 JointLabel PolySkinWeightsCommand::getJointLabel(MDagPath &influence)
 {
-    // TODO - how to handle non-joint objects?
     MStatus status;
     JointLabel result;
 

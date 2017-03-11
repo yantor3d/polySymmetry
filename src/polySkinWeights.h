@@ -75,7 +75,7 @@ public:
     virtual MStatus     makeInfluencesMatch(MFnSkinCluster &fnSourceSkin, MFnSkinCluster &fnDestinationSkin);
     virtual MStatus     makeInfluenceSymmetryTable(MDagPathArray &influences, vector<string> &influenceKeys, unordered_map<string, JointLabel> &jointLabels);
     
-    virtual void        makeWeightTables(vector<string> &influenceKeys);
+    virtual void        setupWeightTables(vector<string> &influenceKeys);
     virtual void        setWeightsTable(unordered_map<string, vector<double>> &weightTable, MDoubleArray &weights, vector<string> &influenceKeys);
     virtual void        getWeightsTable(unordered_map<string, vector<double>> &weightTable, MDoubleArray &weights, vector<string> &influenceKeys);
 
