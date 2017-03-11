@@ -247,8 +247,8 @@ MStatus PolyDeformerWeightsCommand::redoIt()
     MObject sourceComponents;
     MObject destinationComponents;
 
-    getAllComponents(this->sourceMesh, sourceComponents);
-    getAllComponents(this->destinationMesh, destinationComponents);
+    getAllVertices(numberOfVertices, sourceComponents);
+    getAllVertices(numberOfVertices, destinationComponents);
 
     MFloatArray sourceWeights(numberOfVertices);
     MFloatArray destinationWeights(numberOfVertices);
