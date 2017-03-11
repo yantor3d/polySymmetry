@@ -18,7 +18,7 @@
 #include <maya/MStatus.h>
 
 const char* kAUTHOR = "Ryan Porter";
-const char* kVERSION = "0.4.2";
+const char* kVERSION = "0.5.0";
 const char* kREQUIRED_API_VERSION = "Any";
 
 MString PolyDeformerWeightsCommand::COMMAND_NAME    = "polyDeformerWeights";
