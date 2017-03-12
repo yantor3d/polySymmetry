@@ -261,6 +261,22 @@ def mirrorPolySkinWeights(*args, **kwargs):
     if not selectedMeshes:
         raise polySymmetry.utils.InvalidSelection("Select a skinned mesh and try again.")
 
+    if not kwargs:
+        options = polySymmetry.utils.loadOptions('polySkinWeights')
+
+        kwargs = {'mirror': True}
+
+        if options.get('normalize', False):
+            kwargs['normalize'] = True 
+
+        if options.get('useInfluencePattern', True):
+            kwargs['influenceSymmetry'] = (
+                options.get('leftPattern', 'L_*'),
+                options.get('rightPattern', 'R_*')
+            )
+
+        kwargs['direction'] = 1 if options.get('direction', 1) == 1 else -1
+
     with undoChunk():
         for mesh, skin in zip(selectedMeshes, skinClusters):
 
