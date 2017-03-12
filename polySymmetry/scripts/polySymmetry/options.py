@@ -472,11 +472,11 @@ def mirrorPolyDeformerWeightsOptions():
     PolyDeformerWeightsOptionBox(default_action=3)
 
 
-def copyPolySkinWeightOptions():
+def copyPolySkinWeightsOptions():
     PolySkinWeightsOptionBox(default_action=1)
 
 
-def mirrorPolySkinWeightOptions():
+def mirrorPolySkinWeightsOptions():
     PolySkinWeightsOptionBox(default_action=3)
 
 
