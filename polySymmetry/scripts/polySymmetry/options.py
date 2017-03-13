@@ -1,5 +1,7 @@
+import functools
 import json 
 import webbrowser
+
 
 from maya import OpenMaya
 from maya import cmds
@@ -249,6 +251,124 @@ class PolyDeformerWeightsOptionBox(_OptionBox):
             select=1
         )
 
+        cmds.separator()
+
+        self.sourceMeshWidget = cmds.textFieldButtonGrp(
+            label='Source Mesh',
+            buttonLabel='<<<',
+            text="",
+            editable=False
+        )
+
+        self.sourceDeformerWidget = cmds.textFieldGrp(
+            label='Source Deformer',
+            text='',
+            editable=False
+        )
+
+        cmds.textFieldButtonGrp(
+            self.sourceMeshWidget,
+            edit=True,
+            buttonCommand=functools.partial(
+                self._handleLoadSelectedMeshClick,
+                meshWidget=self.sourceMeshWidget,
+                deformerWidget=self.sourceDeformerWidget
+            )
+        )
+
+        cmds.popupMenu(
+            postMenuCommand=functools.partial(
+                self._handleDeformerMenuOpen,
+                meshWidget=self.sourceMeshWidget, 
+                deformerWidget=self.sourceDeformerWidget
+            )
+        )
+
+        cmds.separator()
+
+        self.destinationMeshWidget = cmds.textFieldButtonGrp(
+            label='Destination Mesh',
+            buttonLabel='<<<',
+            text="",
+            editable=False
+        )
+
+        self.destinationDeformerWidget = cmds.textFieldGrp(
+            label='Destination Deformer',
+            text='',
+            editable=False
+        )
+
+        cmds.textFieldButtonGrp(
+            self.destinationMeshWidget,
+            edit=True,
+            buttonCommand=functools.partial(
+                self._handleLoadSelectedMeshClick,
+                meshWidget=self.destinationMeshWidget,
+                deformerWidget=self.destinationDeformerWidget
+            )
+        )
+
+        cmds.popupMenu(
+            postMenuCommand=functools.partial(
+                self._handleDeformerMenuOpen,
+                meshWidget=self.destinationMeshWidget, 
+                deformerWidget=self.destinationDeformerWidget
+            )
+        )
+
+    def _handleLoadSelectedMeshClick(self, *args, **kwargs):
+        meshWidget = kwargs['meshWidget']
+        deformerWidget = kwargs['deformerWidget']
+
+        selectedMesh = _getText(meshWidget)
+        meshes = _cmds._getSelectedMeshes()
+
+        if meshes:
+            if meshes[0] != selectedMesh:
+                _setText(meshWidget, meshes[0])
+                _setText(deformerWidget, "")
+        else:
+            cmds.warning("Must select a mesh")
+
+    def _handleDeformerMenuOpen(self, *args, **kwargs):
+        menu = args[0]
+
+        meshWidget = kwargs['meshWidget']
+        deformerWidget = kwargs['deformerWidget']
+
+        selectedMesh = _getText(meshWidget)
+
+        menuItems = cmds.popupMenu(menu, query=True, itemArray=True) or []
+
+        for item in menuItems:
+            cmds.deleteUI(item)
+
+        if selectedMesh:
+            deformers = cmds.ls(
+                cmds.listHistory(selectedMesh),
+                type="weightGeometryFilter",
+            )
+
+            if deformers:
+                for d in deformers:
+                    cmds.menuItem(
+                        d, 
+                        parent=menu, 
+                        command=functools.partial(
+                            self._handleDeformerMenuItemClick, 
+                            textFieldGrp=deformerWidget, 
+                            text=d
+                        )
+                    )
+            else:
+                cmds.menuItem("Specified mesh is not deformed.")
+        else:
+            cmds.menuItem("No mesh specified.")
+
+    def _handleDeformerMenuItemClick(self, *args, **kwargs):
+        _setText(kwargs['textFieldGrp'], kwargs['text'])
+        
     def _refreshUI(self, *args):
         action = _getChoice(self.actionWidget)
 
@@ -256,6 +376,18 @@ class PolyDeformerWeightsOptionBox(_OptionBox):
             self.directionWidget,
             edit=True,
             enable=action == 3
+        )
+
+        cmds.textFieldButtonGrp(
+            self.destinationMeshWidget,
+            edit=True,
+            visible=action == 1
+        )
+
+        cmds.textFieldGrp(
+            self.destinationDeformerWidget,
+            edit=True,
+            visible=action == 1
         )
 
     def doIt(self):
@@ -270,10 +402,32 @@ class PolyDeformerWeightsOptionBox(_OptionBox):
 
         kwargs['direction'] = 1 if options['direction'] == 1 else -1
 
-        if option['action'] == 1:
-            _cmds.copyPolyDeformerWeights()
+        args = []
+
+        sourceMesh = _getText(self.sourceMeshWidget)
+        sourceDeformer = _getText(self.sourceDeformerWidget)
+
+        destinationMesh = _getText(self.destinationMeshWidget)
+        destinationDeformer = _getText(self.destinationDeformerWidget)
+
+        if sourceMesh:
+            if sourceDeformer:
+                args += [sourceMesh, sourceDeformer]
+            else:
+                OpenMaya.MGlobal.displayError("Must specify a deformer")
+                return
+
+        if options['action'] == 1:        
+            if destinationMesh:
+                if destinationDeformer:
+                    args += [destinationMesh, destinationDeformer]
+                else:
+                    OpenMaya.MGlobal.displayError("Must specify a deformer")
+                    return
+
+            _cmds.copyPolyDeformerWeights(*args)
         else:
-            _cmds.polyDeformerWeights(**kwargs)
+            _cmds.polyDeformerWeights(*args, **kwargs)
                 
     def getOptions(self):
         return {
