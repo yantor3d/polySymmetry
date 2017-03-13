@@ -161,7 +161,7 @@ class _OptionBox(object):
     def _handleApplyClick(self, *args):
         try:
             self.doIt()
-        except _cmds.InvalidSelection as e:
+        except polySymmetry.utils.InvalidSelection as e:
             _ERR(e)
         else:
             self.saveOptions()
@@ -169,7 +169,7 @@ class _OptionBox(object):
     def _handleApplyAndCloseClick(self, *args):        
         try:
             self.doIt()
-        except _cmds.InvalidSelection as e:
+        except polySymmetry.utils.InvalidSelection as e:
             _ERR(e)
         else:
             self.saveOptions()
