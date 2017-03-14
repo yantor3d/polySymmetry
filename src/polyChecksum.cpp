@@ -23,11 +23,12 @@ void PolyChecksum::putBytes(void* bytes, size_t dataSize)
 {
     unsigned char* ptr = (unsigned char*) bytes;
 
-    for (int i = 0; i < dataSize; i++)
+    for (size_t i = 0; i < dataSize; i++)
     {
-        unsigned byte = (unsigned) ptr[i];
+        unsigned byte = *(ptr + i);
         unsigned top = _register >> 24;
         top ^= byte;
+        top &= 255;
 
         _register = (_register << 8) ^ _table [top];
     }
