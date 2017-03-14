@@ -6,6 +6,8 @@
 #ifndef POLY_CHECKSUM_H
 #define POLY_CHECKSUM_H
 
+#include <cstddef>
+
 // based on code found at http://www.relisoft.com/science/CrcOptim.html
 
 class PolyChecksum
