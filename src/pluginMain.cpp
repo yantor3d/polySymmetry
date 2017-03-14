@@ -2,6 +2,7 @@
     Copyright (c) 2017 Ryan Porter
 */
 
+#include "polyChecksumCommand.h"
 #include "polyDeformerWeights.h"
 #include "polyFlipCmd.h"
 #include "polyMirrorCmd.h"
@@ -18,9 +19,10 @@
 #include <maya/MStatus.h>
 
 const char* kAUTHOR = "Ryan Porter";
-const char* kVERSION = "0.5.1";
+const char* kVERSION = "0.5.2";
 const char* kREQUIRED_API_VERSION = "Any";
 
+MString PolyChecksumCommand::COMMAND_NAME           = "polyChecksum";
 MString PolyDeformerWeightsCommand::COMMAND_NAME    = "polyDeformerWeights";
 MString PolyFlipCommand::COMMAND_NAME               = "polyFlip";
 MString PolyMirrorCommand::COMMAND_NAME             = "polyMirror";
@@ -62,6 +64,7 @@ MStatus initializePlugin(MObject obj)
 
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    REGISTER_COMMAND(PolyChecksumCommand);
     REGISTER_COMMAND(PolyDeformerWeightsCommand);
     REGISTER_COMMAND(PolyFlipCommand);
     REGISTER_COMMAND(PolyMirrorCommand);
@@ -102,6 +105,7 @@ MStatus uninitializePlugin(MObject obj)
 
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    DEREGISTER_COMMAND(PolyChecksumCommand);
     DEREGISTER_COMMAND(PolyDeformerWeightsCommand);
     DEREGISTER_COMMAND(PolyFlipCommand);
     DEREGISTER_COMMAND(PolyMirrorCommand);

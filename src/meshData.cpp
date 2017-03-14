@@ -3,6 +3,7 @@
     You may use, distribute, or modify this code under the terms of the MIT license.
 */
 
+#include "polyChecksum.h"
 #include "meshData.h"
 #include "util.h"
 
@@ -34,6 +35,33 @@ void MeshData::clear()
     vertexData.clear();
     edgeData.clear();
     faceData.clear();  
+}
+
+unsigned long MeshData::getVertexChecksum(MDagPath &meshDagPath)
+{
+    PolyChecksum checksum;
+
+    MItMeshVertex itVertex(meshDagPath);
+    
+    while (!itVertex.isDone())
+    {
+        int index = itVertex.index();
+        checksum.putBytes(&index, sizeof(index));
+
+        MIntArray connectedVertices;
+        itVertex.getConnectedVertices(connectedVertices);
+        uint numConnectedVertices = connectedVertices.length();
+
+        for (uint i = 0; i < numConnectedVertices; i++)
+        {
+            uint idx = connectedVertices[i];
+            checksum.putBytes(&idx, sizeof(idx));
+        }
+
+        itVertex.next();
+    }
+
+    return checksum.getResult();
 }
 
 void MeshData::unpackMesh(MDagPath &meshDagPath)

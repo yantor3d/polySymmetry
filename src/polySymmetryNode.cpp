@@ -3,6 +3,7 @@
     You may use, distribute, or modify this code under the terms of the MIT license.
 */
 
+#include "meshData.h"
 #include "polySymmetryNode.h"
 
 #include <string>
@@ -34,6 +35,8 @@ MObject PolySymmetryNode::vertexSymmetry;
 MObject PolySymmetryNode::edgeSides;
 MObject PolySymmetryNode::faceSides;
 MObject PolySymmetryNode::vertexSides;
+
+MObject PolySymmetryNode::vertexChecksum;
 
 PolySymmetryNode::PolySymmetryNode() {}
 PolySymmetryNode::~PolySymmetryNode() {}
@@ -78,6 +81,9 @@ MStatus PolySymmetryNode::initialize()
     vertexSides = t.create(VERTEX_SIDES, "vs", MFnData::kIntArray, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
+    vertexChecksum = n.create(VERTEX_CHECKSUM, "vc", MFnNumericData::kLong, -1, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     addAttribute(numberOfEdges);
     addAttribute(numberOfFaces);
     addAttribute(numberOfVertices);
@@ -89,6 +95,8 @@ MStatus PolySymmetryNode::initialize()
     addAttribute(edgeSides);
     addAttribute(faceSides);
     addAttribute(vertexSides);
+
+    addAttribute(vertexChecksum);
 
     return MStatus::kSuccess;    
 }
@@ -188,21 +196,26 @@ MStatus PolySymmetryNode::getCacheKey(MObject &node, string &key)
     int numberOfEdges;
     int numberOfFaces;
     int numberOfVertices;
+    int vertexChecksum;
 
     MFnDependencyNode fnNode(node);
 
     PolySymmetryNode::getValue(fnNode, NUMBER_OF_EDGES, numberOfEdges);
     PolySymmetryNode::getValue(fnNode, NUMBER_OF_FACES, numberOfFaces);
     PolySymmetryNode::getValue(fnNode, NUMBER_OF_VERTICES, numberOfVertices);
+    PolySymmetryNode::getValue(fnNode, VERTEX_CHECKSUM, vertexChecksum);
 
-    if (numberOfEdges == -1 || numberOfFaces == -1 || numberOfVertices == -1)
+    if (numberOfEdges == -1 || numberOfFaces == -1 || numberOfVertices == -1 || vertexChecksum == -1)
     {
-        MString cacheErrorMessage("Cannot cache ^1s because it has no data. Use `polySymmetry -edit -cache` to cache the node once it has data.");
+        MString cacheErrorMessage("Cannot cache ^1s because it has incomplete data. Delete it and try again.");
         cacheErrorMessage.format(cacheErrorMessage, fnNode.name());
 
         MGlobal::displayWarning(cacheErrorMessage);
     } else {
-        key = to_string(numberOfEdges) + ":" + to_string(numberOfFaces) + ":" + to_string(numberOfVertices);
+        key = to_string(numberOfEdges) + ":" + 
+              to_string(numberOfFaces) + ":" + 
+              to_string(numberOfVertices) + ":" + 
+              to_string(vertexChecksum);
     }
 
     return MStatus::kSuccess;
@@ -219,7 +232,12 @@ MStatus PolySymmetryNode::getCacheKeyFromMesh(MDagPath &dagPath, string &key)
     int numberOfFaces = fnMesh.numPolygons();
     int numberOfVertices = fnMesh.numVertices();
 
-    key = to_string(numberOfEdges) + ":" + to_string(numberOfFaces) + ":" + to_string(numberOfVertices);
+    int vertexChecksum = (int) MeshData::getVertexChecksum(dagPath);
+
+    key = to_string(numberOfEdges) + ":" 
+        + to_string(numberOfFaces) + ":" 
+        + to_string(numberOfVertices) + ":" 
+        + to_string(vertexChecksum);
 
     return MStatus::kSuccess; 
 }

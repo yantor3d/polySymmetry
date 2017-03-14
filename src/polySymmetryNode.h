@@ -22,6 +22,7 @@
 #define NUMBER_OF_FACES "numberOfFaces"
 #define NUMBER_OF_VERTICES "numberOfVertices"
 
+#define VERTEX_CHECKSUM "vertexChecksum"
 #define EDGE_SYMMETRY "edgeSymmetry"
 #define FACE_SYMMETRY "faceSymmetry"
 #define VERTEX_SYMMETRY "vertexSymmetry"
@@ -68,8 +69,10 @@ public:
     static MObject      faceSides;
     static MObject      vertexSides;
 
-    static  MString     NODE_NAME;
-    static  MTypeId     NODE_ID;
+    static MObject      vertexChecksum;
+    
+    static MString      NODE_NAME;
+    static MTypeId      NODE_ID;
 };
 
 #endif 

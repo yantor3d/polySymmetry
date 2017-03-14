@@ -519,6 +519,10 @@ MStatus PolySymmetryCommand::createResultNode()
     status = PolySymmetryNode::setValue(fnNode, NUMBER_OF_VERTICES, this->meshData.numberOfVertices);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    int vertexChecksum = (int) MeshData::getVertexChecksum(this->selectedMesh);
+    status = PolySymmetryNode::setValue(fnNode, VERTEX_CHECKSUM, vertexChecksum);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     this->setResult(fnNode.name());
 
     PolySymmetryCache::addNodeToCache(meshSymmetryNode);

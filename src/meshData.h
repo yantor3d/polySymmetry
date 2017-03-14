@@ -37,8 +37,10 @@ public:
     MeshData();
     virtual ~MeshData();
 
-    virtual void        unpackMesh(MDagPath &meshDagPath);
-    virtual void        clear();
+    virtual void            unpackMesh(MDagPath &meshDagPath);
+    virtual void            clear();
+
+    static unsigned long    getVertexChecksum(MDagPath &meshDagPath);
 
 private:
     
@@ -57,6 +59,8 @@ public:
     vector<VertexData>      vertexData;
     vector<EdgeData>        edgeData;
     vector<FaceData>        faceData;
+
+    unsigned long           vertexChecksum;
 };
 
 
