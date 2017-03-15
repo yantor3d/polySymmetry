@@ -2,7 +2,7 @@
     Copyright (c) 2017 Ryan Porter    
     You may use, distribute, or modify this code under the terms of the MIT license.
 */
-
+ 
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
@@ -1121,20 +1121,10 @@ void PolySkinWeightsCommand::getJointLabels(MDagPathArray &influences, vector<st
     if (this->isInfluenceSymmetryFlagSet)
     {
         string wildcard = string("*");
-        string regexAny = string(".*");
-        string emptyString = string("");
+        string regexAny = string("(.*)");
 
-        string leftToken = pystring::replace(leftInfluencePattern, regexAny, emptyString);
-        string rightToken = pystring::replace(rightInfluencePattern, regexAny, emptyString);
-
-        leftToken = pystring::replace(leftToken, wildcard, emptyString);
-        rightToken = pystring::replace(rightToken, wildcard, emptyString);
-
-        string leftRegexPattern = pystring::replace(leftInfluencePattern, regexAny, wildcard);
-        string rightRegexPattern = pystring::replace(rightInfluencePattern, regexAny, wildcard);
-
-        leftRegexPattern = pystring::replace(leftRegexPattern, wildcard, regexAny);
-        rightRegexPattern = pystring::replace(rightRegexPattern, wildcard, regexAny);
+        string leftRegexPattern = pystring::replace(leftInfluencePattern, wildcard, regexAny);
+        string rightRegexPattern = pystring::replace(rightInfluencePattern, wildcard, regexAny);
 
         regex leftRegex(leftRegexPattern);
         regex rightRegex(rightRegexPattern);
@@ -1146,15 +1136,34 @@ void PolySkinWeightsCommand::getJointLabels(MDagPathArray &influences, vector<st
 
             JointLabel newJointLabel;
 
-            bool isLeft = regex_match(influenceName, leftRegex);
-            bool isRight = regex_match(influenceName, rightRegex);
+            smatch leftMatches;
+            smatch rightMatches;
+
+            bool isLeft = regex_match(influenceName, leftMatches, leftRegex);
+            bool isRight = regex_match(influenceName, rightMatches, rightRegex);
 
             if (isLeft) 
-            {
-                influenceName = pystring::replace(influenceName, leftToken, emptyString);
+            {                
+                stringstream ss;
+
+                for (int i = 1; i < leftMatches.size(); i++) 
+                { 
+                    ss << leftMatches[i].str(); 
+                }
+
+                influenceName = ss.str();
+
                 newJointLabel.side = LEFT_SIDE;
             } else if (isRight) {
-                influenceName = pystring::replace(influenceName, rightToken, emptyString);
+                stringstream ss;
+                
+                for (int i = 1; i < rightMatches.size(); i++) 
+                { 
+                    ss << rightMatches[i].str(); 
+                }
+
+                influenceName = ss.str();
+
                 newJointLabel.side = RIGHT_SIDE;            
             } else {
                 newJointLabel.side = CENTER_SIDE;
