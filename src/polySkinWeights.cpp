@@ -5,7 +5,6 @@
  
 #include <algorithm>
 #include <iostream>
-#include <iomanip>
 #include <regex>
 #include <stdio.h>
 #include <sstream>
@@ -806,7 +805,6 @@ MStatus PolySkinWeightsCommand::copyPolySkinWeights()
         this->normalizeWeights,
         &this->oldWeightValues
     );
-
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     return MStatus::kSuccess;    
@@ -977,12 +975,14 @@ void PolySkinWeightsCommand::setWeightsTable(unordered_map<string, vector<double
 {
     uint numberOfInfluences = (uint) influenceKeys.size();
     
-    for (uint i = 0; i < this->numberOfVertices; i++)
+    for (uint j = 0; j < numberOfInfluences; j++)
     {
-        for (uint j = 0; j < numberOfInfluences; j++)
+        vector<double> &weightList = oldWeights[influenceKeys[j]];
+
+        for (uint i = 0; i < this->numberOfVertices; i++)
         {
             uint wi = (i * numberOfInfluences) + j;
-            oldWeights[influenceKeys[j]][i] = weights[wi];
+            weightList[i] = weights[wi];
         }
     }
 }
@@ -996,10 +996,12 @@ void PolySkinWeightsCommand::getWeightsTable(unordered_map<string, vector<double
 
     for (uint j = 0; j < numberOfInfluences; j++)
     {
-        for (int i : selectedVertexIndices)
+        vector<double> &weightList = weightTable[influenceKeys[j]];
+
+        for (int &i : selectedVertexIndices)
         {            
             uint wi = (i * numberOfInfluences) + j;            
-            double wt = weightTable[influenceKeys[j]][i];
+            double wt = weightList[i];
 
             weights.set(wt, wi);
         }
@@ -1053,11 +1055,14 @@ MStatus PolySkinWeightsCommand::getInfluenceKeys(MFnSkinCluster &fnSkin, vector<
 /* Copy the weights from the old weights table to the new weights table */
 void PolySkinWeightsCommand::copyWeightsTable(vector<string> &influenceKeys)
 {
-    for (string ii : influenceKeys)
+    for (string &ii : influenceKeys)
     {
+        vector<double> &newWeightsList = newWeights[ii];
+        vector<double> &oldWeightsList = oldWeights[ii];
+
         for (uint i = 0; i < numberOfVertices; i++)
         {
-            newWeights[ii][i] = oldWeights[ii][i];
+            newWeightsList[i] = oldWeightsList[i];
         }
     }
 }
@@ -1071,16 +1076,19 @@ void PolySkinWeightsCommand::flipWeightsTable(vector<string> &influenceKeys)
     MFnDependencyNode fnNode(this->polySymmetryData);
     PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
 
-    for (string ii : influenceKeys)
+    for (string &ii : influenceKeys)
     {        
-        string oi = influenceSymmetry[ii];
+        string &oi = influenceSymmetry[ii];
 
-        for (int i : selectedVertexIndices)
+        vector<double> &newWeightsList = newWeights[ii];
+        vector<double> &oldWeightsList = oldWeights[oi];
+
+        for (int &i : selectedVertexIndices)
         {
-            int o = vertexSymmetry[i];
+            int &o = vertexSymmetry[i];
 
-            newWeights[ii][i] = oldWeights[oi][o];
-            newWeights[ii][o] = oldWeights[oi][i];
+            newWeightsList[i] = oldWeightsList[o];
+            newWeightsList[o] = oldWeightsList[i];
         }
     }
 }
@@ -1096,18 +1104,27 @@ void PolySkinWeightsCommand::mirrorWeightsTable(vector<string> &influenceKeys)
     PolySymmetryNode::getValues(fnNode, VERTEX_SYMMETRY, vertexSymmetry);
     PolySymmetryNode::getValues(fnNode, VERTEX_SIDES, vertexSides);
 
-    for (string ii : influenceKeys)
+    vector<int> leftVertexMasks(numberOfVertices);
+    vector<int> rightVertexMasks(numberOfVertices);
+
+    for (int &i : selectedVertexIndices)
     {
-        string oi = influenceSymmetry[ii];
+        leftVertexMasks[i] = (vertexSides[i] == CENTER_SIDE) | (vertexSides[i] == direction);
+        rightVertexMasks[i] = 1 - leftVertexMasks[i];
+    }
+    
+    for (string &ii : influenceKeys)
+    {
+        string &oi = influenceSymmetry[ii];
 
-        for (int i : selectedVertexIndices)
+        vector<double> &newInfluenceWeights = newWeights[ii];
+        vector<double> &oldInfluenceAWeights = oldWeights[ii];
+        vector<double> &oldInfluenceBWeights = oldWeights[oi];
+
+        for (int &i : selectedVertexIndices)
         {                
-            int o = vertexSymmetry[i];
-
-            int leftVertexMask = (vertexSides[i] == CENTER_SIDE) | (vertexSides[i] == direction);
-            int rightVertexMask = 1 - leftVertexMask;
-       
-            newWeights[ii][i] = (leftVertexMask * oldWeights[ii][i]) + (rightVertexMask * oldWeights[oi][o]);
+            int &o = vertexSymmetry[i];       
+            newInfluenceWeights[i] = (leftVertexMasks[i] * oldInfluenceAWeights[i]) + (rightVertexMasks[i] * oldInfluenceBWeights[o]);
         }
     }
 }
