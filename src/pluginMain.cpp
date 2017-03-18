@@ -19,7 +19,7 @@
 #include <maya/MStatus.h>
 
 const char* kAUTHOR = "Ryan Porter";
-const char* kVERSION = "0.5.2";
+const char* kVERSION = "0.6.0";
 const char* kREQUIRED_API_VERSION = "Any";
 
 MString PolyChecksumCommand::COMMAND_NAME           = "polyChecksum";
